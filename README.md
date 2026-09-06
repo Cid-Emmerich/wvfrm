@@ -25,12 +25,19 @@ album, crossfading between songs, and a single help screen on **ctrl+k**.
 
 ## Install
 
-You need Go 1.25 or newer. `ffmpeg` is optional but recommended: without it
-wvfrm plays mp3, flac, wav and ogg; with it, also m4a/aac, opus, wma, aiff and
-anything else ffmpeg can decode.
+You need **Go 1.25 or newer** to build wvfrm. `ffmpeg` is optional but
+recommended: without it wvfrm plays mp3, flac, wav and ogg; with it, also
+m4a/aac, opus, wma, aiff and anything else ffmpeg can decode.
 
 ```sh
-brew install go ffmpeg        # macOS; on Linux use your package manager
+brew install go ffmpeg   # macOS; on Linux use your package manager
+go version               # confirm Go is on your PATH before continuing
+```
+
+If `go version` fails, Go isn't installed (or isn't on your `PATH`) — fix that
+before going further; `go build` needs it, and `ffmpeg` alone won't be enough.
+
+```sh
 git clone https://github.com/Cid-Emmerich/wvfrm
 cd wvfrm
 go build -o wvfrm ./cmd/wvfrm
