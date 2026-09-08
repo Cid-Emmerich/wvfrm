@@ -202,3 +202,7 @@ internal/ui        terminal interface (tcell)
 ```
 
 Designed, coded and distributed by Cid Emmerich.
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Cid Emmerich.
