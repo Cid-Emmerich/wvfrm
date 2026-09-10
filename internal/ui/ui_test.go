@@ -143,7 +143,7 @@ func TestUIWalkthrough(t *testing.T) {
 	special(a, tcell.KeyEscape)
 
 	// Transport keys
-	for _, r := range " nbsrf{}m+-" {
+	for _, r := range " jklsrf{}m+-" {
 		key(a, r)
 	}
 	special(a, tcell.KeyLeft)
@@ -197,7 +197,7 @@ func TestUIWalkthrough(t *testing.T) {
 	if !strings.Contains(txt, "▶") || !strings.Contains(txt, "track(s)") {
 		t.Errorf("queue view broken\n%s", txt)
 	}
-	key(a, 'j')
+	special(a, tcell.KeyDown)
 	key(a, 'x')
 	key(a, 'g')
 	special(a, tcell.KeyEnter)
