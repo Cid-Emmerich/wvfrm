@@ -174,3 +174,69 @@ func copyTree(t *testing.T, src, dst string) {
 		t.Fatal(err)
 	}
 }
+
+// TestArtistBackdrop puts a photo in the artist folder and checks the
+// library rows are painted with it behind the text.
+func TestArtistBackdrop(t *testing.T) {
+	root := os.Getenv("WVFRM_TEST_MUSIC")
+	if root == "" {
+		t.Skip("set WVFRM_TEST_MUSIC")
+	}
+	tmp := t.TempDir()
+	copyTree(t, root, tmp)
+	cover, _ := os.ReadFile(filepath.Join(tmp, "Aurora Fields", "Night Signals", "cover.png"))
+	os.WriteFile(filepath.Join(tmp, "Aurora Fields", "artist.png"), cover, 0o644)
+	lib, _ := library.Load(tmp, filepath.Join(t.TempDir(), "c.json"), nil)
+	cfg := config.Default()
+	cfg.MusicDir = tmp
+	cfg.CachePath = filepath.Join(t.TempDir(), "cache.json")
+	pl := audio.New()
+	defer pl.Close()
+	scr := tcell.NewSimulationScreen("UTF-8")
+	scr.Init()
+	scr.SetSize(80, 20)
+	a := New(&cfg, lib, pl)
+	a.scr = scr
+	a.view = ViewLibrary
+	a.lv.cursor = 0 // Aurora Fields
+	a.draw()        // kicks off the photo load
+	for i := 0; i < 100 && a.photos["Aurora Fields"] == nil; i++ {
+		if ev := scr.PollEvent(); ev != nil {
+			a.handle(ev)
+		}
+	}
+	if a.photos["Aurora Fields"] == nil {
+		t.Fatal("artist photo never loaded")
+	}
+	a.draw()
+	cells, w, _ := scr.GetContents()
+	painted := 0
+	for y := 1; y < 4; y++ {
+		for x := 0; x < w; x++ {
+			_, bg, _ := cells[y*w+x].Style.Decompose()
+			if bg != tcell.ColorDefault {
+				painted++
+			}
+		}
+	}
+	if painted < w { // at least the two non-cursor rows should carry colour
+		t.Errorf("backdrop painted %d cells only", painted)
+	}
+	// moving to an artist without a photo clears it
+	a.lv.cursor = 1
+	a.draw()
+	for i := 0; i < 100; i++ {
+		if ev := scr.PollEvent(); ev != nil {
+			a.handle(ev)
+		}
+		if _, ok := a.photos["The Static Choir"]; ok {
+			break
+		}
+	}
+	a.draw()
+	cells, w, _ = scr.GetContents()
+	_, bg, _ := cells[3*w+5].Style.Decompose()
+	if bg != tcell.ColorDefault {
+		t.Error("backdrop should be gone for an artist without a photo")
+	}
+}

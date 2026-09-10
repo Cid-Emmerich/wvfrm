@@ -92,6 +92,16 @@ type App struct {
 	prompt prompt
 	pick   picker
 
+	// artist photos (library backdrop)
+	photos    map[string]*art.Art
+	photoBusy map[string]bool
+	backdrop  struct {
+		key   string
+		cells [][]art.RGB
+	}
+	miniVis    vis.Mini
+	miniCanvas *vis.Canvas
+
 	// queue view
 	qCursor, qScroll int
 
@@ -280,6 +290,12 @@ func (a *App) handle(ev tcell.Event) {
 			a.showToast(d.msg, d.isErr)
 		case mediaEvent:
 			a.onMediaCommand(d.cmd)
+		case photoResult:
+			if d.reload {
+				a.forgetPhoto(d.name)
+			} else {
+				a.onPhotoResult(d)
+			}
 		}
 	}
 }
@@ -388,41 +404,6 @@ func (a *App) onArtResult(r artResult) {
 		a.showToast(r.note, false)
 	}
 	a.applyTheme()
-}
-
-// findArtOnline searches the web for the current album's cover and attaches it.
-func (a *App) findArtOnline() {
-	t := a.pl.Current()
-	if t == nil {
-		a.showToast("nothing playing", true)
-		return
-	}
-	if a.busy != "" {
-		a.showToast(a.busy+" already running", false)
-		return
-	}
-	album := a.lib.FindAlbum(t)
-	if album == nil {
-		album = &library.Album{Name: t.Album, Artist: t.AlbumArtist, Tracks: []*library.Track{t}}
-	}
-	a.busy = "searching for artwork"
-	a.showToast("searching for artwork: "+album.Artist+" – "+album.Name+"…", false)
-	go func() {
-		data, src, err := art.FindOnline(album.Artist, album.Name)
-		if err != nil {
-			a.scr.PostEvent(tcell.NewEventInterrupt(toastEvent{"no artwork found: " + err.Error(), true}))
-			return
-		}
-		if _, err := art.Decode(data); err != nil {
-			a.scr.PostEvent(tcell.NewEventInterrupt(toastEvent{"downloaded image is not readable", true}))
-			return
-		}
-		res := art.Attach(album, data)
-		_ = a.lib.SaveCache(a.cfg.CachePath)
-		loaded, _ := art.Load(t)
-		a.scr.PostEvent(tcell.NewEventInterrupt(artResult{track: t, art: loaded, note: "art from " + src + ": " + res.Summary()}))
-		a.scr.PostEvent(tcell.NewEventInterrupt(toastEvent{"art attached (" + src + ")", false}))
-	}()
 }
 
 func (a *App) showToast(msg string, isErr bool) {

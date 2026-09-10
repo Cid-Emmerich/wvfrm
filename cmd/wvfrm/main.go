@@ -48,7 +48,7 @@ usage:
   wvfrm all                    play the whole library in order
   wvfrm playlist <name>        play a saved playlist
   wvfrm playlists              list saved playlists
-  wvfrm art <album words>      find cover art online and attach it (no UI)
+  wvfrm art <album words>      find cover art and the artist photo online (no UI)
   wvfrm path <dir>             set the music folder (default ~/Music)
   wvfrm scan                   rescan the music folder
   wvfrm themes                 list colour themes
@@ -199,6 +199,19 @@ func main() {
 			fmt.Printf("%s\n  %s\n", src, res.Summary())
 		}
 		_ = lib.SaveCache(cfg.CachePath)
+		if len(albums) > 0 {
+			if ar := lib.FindArtist(albums[0].Artist); ar != nil {
+				fmt.Printf("%s: searching for a photo… ", ar.Name)
+				data, src, err := art.FindArtistOnline(ar.Name)
+				if err != nil {
+					fmt.Println("not found:", err)
+				} else if p, err := art.SaveArtistPhoto(cfg.MusicDir, filepath.Dir(cfg.CachePath), ar, data); err != nil {
+					fmt.Println("could not save:", err)
+				} else {
+					fmt.Printf("%s\n  saved %s\n", src, p)
+				}
+			}
+		}
 		return
 	}
 

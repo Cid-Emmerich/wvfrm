@@ -301,12 +301,27 @@ func (a *App) drawArtLayout(w, top, mh int, st audio.Status) {
 			style tcell.Style
 		}{"ascii charset: " + a.charset + " (c to change)", a.st(a.th.Muted)})
 	}
-	iy := top + (mh-len(lines))/2
+	// Small spectrum under the details, kew style.
+	eqH := min(5, mh-len(lines)-2)
+	if eqH < 2 || st.Track == nil {
+		eqH = 0
+	}
+	iy := top + (mh-len(lines)-eqH)/2
 	if iy < top {
 		iy = top
 	}
 	for i, l := range lines {
 		a.puts(ix, iy+i, fit(l.s, iw), l.style, iw)
+	}
+	if eqH > 0 {
+		ew := min(iw, 48)
+		if a.miniCanvas == nil || a.miniCanvas.W != ew || a.miniCanvas.H != eqH {
+			a.miniCanvas = vis.NewCanvas(ew, eqH)
+		}
+		a.miniCanvas.Clear()
+		f := &vis.Frame{Analyzer: a.pl.Analyzer, Opts: &a.visOpts, Theme: a.th, Time: time.Since(a.visStart).Seconds(), Playing: st.Playing}
+		a.miniVis.Draw(a.miniCanvas, f)
+		a.blit(a.miniCanvas.Cells, ew, eqH, ix, iy+len(lines)+1, a.th.Accent)
 	}
 }
 
@@ -509,6 +524,7 @@ func (a *App) drawLibrary(w, h int) {
 		v.scroll = 0
 	}
 	cur := a.pl.Current()
+	defer a.applyBackdrop(w, 1, rows, 1+v.cursor-v.scroll)
 	for i := 0; i < rows; i++ {
 		idx := v.scroll + i
 		if idx >= len(v.nodes) {
@@ -625,6 +641,28 @@ func (a *App) drawLibrary(w, h int) {
 	}
 	x := 1 + a.puts(1, h-2, "["+modeNames[v.mode]+"] ", a.st(a.th.Accent), w-2)
 	a.puts(x, h-2, fit(status, w-x-1), a.st(a.th.Muted), w-x-1)
+}
+
+// applyBackdrop paints the artist photo behind rows y0..y0+rows of the
+// library, keeping whatever text is already there. The cursor row keeps
+// its own highlight.
+func (a *App) applyBackdrop(w, y0, rows, skipRow int) {
+	cells := a.libraryBackdrop(w, rows)
+	if cells == nil {
+		return
+	}
+	for y := 0; y < rows && y < len(cells); y++ {
+		if y0+y == skipRow {
+			continue
+		}
+		for x := 0; x < w && x < len(cells[y]); x++ {
+			ch, comb, style, _ := a.scr.GetContent(x, y0+y)
+			if ch == 0 {
+				ch = ' '
+			}
+			a.scr.SetContent(x, y0+y, ch, comb, style.Background(tc(cells[y][x])))
+		}
+	}
 }
 
 // drawPicker lists candidate artists for the merge tool.
