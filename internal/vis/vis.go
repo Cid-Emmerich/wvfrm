@@ -74,7 +74,11 @@ var Registry = []Visualizer{
 	&VU{},
 	&Lissajous{},
 	&Ripple{},
+	&LED{},
 	&Matrix{},
+	&Skate{},
+	&Flock{},
+	&MacOS{},
 }
 
 // Names lists visualizer names.

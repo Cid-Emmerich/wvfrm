@@ -620,14 +620,14 @@ func (s *Ripple) Draw(c *Canvas, f *Frame) {
 }
 
 // ---------------------------------------------------------------------------
-// Matrix: LED-panel style discrete cells.
+// LED: LED-panel style discrete cells.
 
-type Matrix struct{ b bands }
+type LED struct{ b bands }
 
-func (*Matrix) Name() string     { return "matrix" }
-func (*Matrix) Describe() string { return "LED panel of discrete cells" }
+func (*LED) Name() string     { return "led" }
+func (*LED) Describe() string { return "LED panel of discrete cells" }
 
-func (s *Matrix) Draw(c *Canvas, f *Frame) {
+func (s *LED) Draw(c *Canvas, f *Frame) {
 	cw := max(1, f.Opts.BarWidth)
 	gx := max(1, f.Opts.Gap)
 	cols := (c.W + gx) / (cw + gx)
