@@ -12,6 +12,7 @@ import (
 	"github.com/Cid-Emmerich/wvfrm/internal/audio"
 	"github.com/Cid-Emmerich/wvfrm/internal/config"
 	"github.com/Cid-Emmerich/wvfrm/internal/library"
+	"github.com/Cid-Emmerich/wvfrm/internal/mediakeys"
 	"github.com/Cid-Emmerich/wvfrm/internal/theme"
 	"github.com/Cid-Emmerich/wvfrm/internal/vis"
 )
@@ -41,6 +42,9 @@ type toastEvent struct {
 	msg   string
 	isErr bool
 }
+
+// mediaEvent is posted when the system media keys send a command.
+type mediaEvent struct{ cmd mediakeys.Command }
 
 // App is the whole interactive player.
 type App struct {
@@ -96,6 +100,15 @@ type App struct {
 
 	lastTrack    *library.Track
 	mouseSeekRow int
+
+	// what was last published to the system's Now Playing display
+	nowPub struct {
+		track   *library.Track
+		playing bool
+		art     *art.Art
+		pos     float64
+		at      time.Time
+	}
 }
 
 // New builds the app. The player must already be started.
@@ -182,6 +195,10 @@ func (a *App) RunWith(scr tcell.Screen, startView View) error {
 	a.pl.OnChange(func() {
 		scr.PostEvent(tcell.NewEventInterrupt(nil))
 	})
+	mediakeys.Start(func(c mediakeys.Command) {
+		scr.PostEvent(tcell.NewEventInterrupt(mediaEvent{c}))
+	})
+	defer mediakeys.Clear()
 	if t := a.pl.Current(); t != nil {
 		a.requestArt(t)
 	}
@@ -211,6 +228,7 @@ func (a *App) RunWith(scr tcell.Screen, startView View) error {
 			break
 		}
 		a.draw()
+		a.publishNowPlaying()
 	}
 	a.kittyClear()
 	scr.Fini()
@@ -258,8 +276,64 @@ func (a *App) handle(ev tcell.Event) {
 		case toastEvent:
 			a.busy = ""
 			a.showToast(d.msg, d.isErr)
+		case mediaEvent:
+			a.onMediaCommand(d.cmd)
 		}
 	}
+}
+
+func (a *App) onMediaCommand(c mediakeys.Command) {
+	switch c {
+	case mediakeys.CmdPlay:
+		if a.pl.Current() == nil {
+			a.playTracks(a.lib.AllTracks(), 0)
+		} else if a.pl.Status().Paused {
+			a.pl.TogglePause()
+		}
+	case mediakeys.CmdPause:
+		if st := a.pl.Status(); st.Track != nil && !st.Paused {
+			a.pl.TogglePause()
+		}
+	case mediakeys.CmdToggle:
+		a.pl.TogglePause()
+	case mediakeys.CmdNext:
+		a.pl.Next()
+	case mediakeys.CmdPrev:
+		a.pl.Prev()
+	case mediakeys.CmdStop:
+		a.pl.Pause()
+	}
+}
+
+// publishNowPlaying tells the system what is playing whenever the track,
+// pause state or artwork changes, or the position jumps (a seek).
+func (a *App) publishNowPlaying() {
+	st := a.pl.Status()
+	p := &a.nowPub
+	expected := p.pos
+	if p.playing {
+		expected += time.Since(p.at).Seconds()
+	}
+	drift := st.Position - expected
+	if drift < 0 {
+		drift = -drift
+	}
+	if st.Track == p.track && st.Playing == p.playing && a.curArt == p.art && drift < 2 {
+		return
+	}
+	p.track, p.playing, p.art, p.pos, p.at = st.Track, st.Playing, a.curArt, st.Position, time.Now()
+	if st.Track == nil {
+		mediakeys.Clear()
+		return
+	}
+	info := mediakeys.Info{
+		Title: st.Track.Title, Artist: st.Track.Artist, Album: st.Track.Album,
+		Duration: st.Duration, Position: st.Position, Playing: st.Playing,
+	}
+	if a.curArt != nil && a.artTrack == st.Track {
+		info.Artwork = a.curArt.Raw
+	}
+	mediakeys.Update(info)
 }
 
 func (a *App) onTrackChange() {

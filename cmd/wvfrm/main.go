@@ -15,18 +15,25 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Cid-Emmerich/wvfrm/internal/art"
 	"github.com/Cid-Emmerich/wvfrm/internal/audio"
 	"github.com/Cid-Emmerich/wvfrm/internal/config"
 	"github.com/Cid-Emmerich/wvfrm/internal/library"
+	"github.com/Cid-Emmerich/wvfrm/internal/mediakeys"
 	"github.com/Cid-Emmerich/wvfrm/internal/theme"
 	"github.com/Cid-Emmerich/wvfrm/internal/ui"
 	"github.com/Cid-Emmerich/wvfrm/internal/vis"
 )
 
-const version = "0.1.0"
+const version = "1.1.0"
+
+// The macOS media-key bridge needs the process's main thread to run the
+// system event loop, so the main goroutine is pinned to it and the player
+// itself runs on another goroutine (see the end of main).
+func init() { runtime.LockOSThread() }
 
 func usage() {
 	fmt.Print(`wvfrm ` + version + ` – terminal music player
@@ -243,8 +250,15 @@ func main() {
 	}
 
 	app := ui.New(&cfg, lib, pl)
-	if err := app.Run(start); err != nil {
-		fail("%v", err)
+	done := make(chan struct{})
+	var runErr error
+	go func() {
+		runErr = app.Run(start)
+		close(done)
+	}()
+	mediakeys.RunLoop(done)
+	if runErr != nil {
+		fail("%v", runErr)
 	}
 }
 
