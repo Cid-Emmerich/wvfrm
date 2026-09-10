@@ -54,7 +54,14 @@ type Library struct {
 	Tracks    []*Track  `json:"tracks"`
 
 	Artists []*Artist `json:"-"`
+	Aliases *Aliases  `json:"-"` // artist merges, see alias.go
 	byPath  map[string]*Track
+}
+
+// SetAliases installs the artist alias table and regroups the library.
+func (l *Library) SetAliases(a *Aliases) {
+	l.Aliases = a
+	l.build()
 }
 
 // Supported audio extensions. Native decoders cover the first four; anything
@@ -211,14 +218,15 @@ func (l *Library) build() {
 	albums := map[key]*Album{}
 	artists := map[string]*Artist{}
 	for _, t := range l.Tracks {
-		k := key{norm(t.AlbumArtist), norm(t.Album)}
+		artistName := l.Aliases.Resolve(t.AlbumArtist)
+		k := key{norm(artistName), norm(t.Album)}
 		a, ok := albums[k]
 		if !ok {
-			a = &Album{Name: t.Album, Artist: t.AlbumArtist, Year: t.Year, Dir: filepath.Dir(t.Path)}
+			a = &Album{Name: t.Album, Artist: artistName, Year: t.Year, Dir: filepath.Dir(t.Path)}
 			albums[k] = a
 			ar, ok := artists[k.artist]
 			if !ok {
-				ar = &Artist{Name: t.AlbumArtist}
+				ar = &Artist{Name: artistName}
 				artists[k.artist] = ar
 			}
 			ar.Albums = append(ar.Albums, a)
@@ -280,7 +288,7 @@ func (l *Library) Albums() []*Album {
 func (l *Library) FindAlbum(t *Track) *Album {
 	for _, ar := range l.Artists {
 		for _, a := range ar.Albums {
-			if norm(a.Name) == norm(t.Album) && norm(a.Artist) == norm(t.AlbumArtist) {
+			if norm(a.Name) == norm(t.Album) && norm(a.Artist) == norm(l.Aliases.Resolve(t.AlbumArtist)) {
 				return a
 			}
 		}

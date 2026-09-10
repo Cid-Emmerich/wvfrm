@@ -6,15 +6,25 @@ import (
 	"github.com/Cid-Emmerich/wvfrm/internal/library"
 )
 
+// Library browse modes, cycled with b.
+const (
+	ModeArtists = iota
+	ModeAlbums
+	ModePlaylists
+)
+
+var modeNames = []string{"artists", "albums", "playlists"}
+
 // node is one visible row in the library tree.
 type node struct {
-	kind   library.Kind
-	depth  int
-	artist *library.Artist
-	album  *library.Album
-	track  *library.Track
-	key    string
-	result *library.Result // set in filter mode
+	kind     library.Kind
+	depth    int
+	artist   *library.Artist
+	album    *library.Album
+	track    *library.Track
+	playlist *library.Playlist
+	key      string
+	result   *library.Result // set in filter mode
 }
 
 // tracks returns the play queue for the node.
@@ -31,6 +41,8 @@ func (n node) tracks() []*library.Track {
 		return out
 	case library.KindAlbum:
 		return n.album.Tracks
+	case library.KindPlaylist:
+		return n.playlist.Tracks
 	default:
 		return []*library.Track{n.track}
 	}
@@ -38,13 +50,14 @@ func (n node) tracks() []*library.Track {
 
 // libView holds the library browser state.
 type libView struct {
-	lib      *library.Library
-	nodes    []node
-	cursor   int
-	scroll   int
-	expanded map[string]bool
-	filter   string
-	typing   bool
+	lib       *library.Library
+	nodes     []node
+	cursor    int
+	scroll    int
+	expanded  map[string]bool
+	filter    string
+	mode      int
+	playlists []*library.Playlist
 }
 
 func (v *libView) init(lib *library.Library) {
@@ -53,13 +66,33 @@ func (v *libView) init(lib *library.Library) {
 	v.rebuild()
 }
 
-func artistKey(ar *library.Artist) string { return "ar:" + ar.Name }
-func albumKey(al *library.Album) string   { return "al:" + al.Artist + "|" + al.Name }
+func artistKey(ar *library.Artist) string       { return "ar:" + ar.Name }
+func albumKey(al *library.Album) string         { return "al:" + al.Artist + "|" + al.Name }
+func playlistKey(pl *library.Playlist) string   { return "pl:" + pl.Path }
+
+// setMode switches between artists, albums and playlists.
+func (v *libView) setMode(m int) {
+	v.mode = ((m % len(modeNames)) + len(modeNames)) % len(modeNames)
+	v.cursor, v.scroll = 0, 0
+	if v.mode == ModePlaylists {
+		v.playlists = v.lib.Playlists()
+	}
+	v.rebuild()
+}
+
+// reloadPlaylists re-reads the playlist folder.
+func (v *libView) reloadPlaylists() {
+	v.playlists = v.lib.Playlists()
+	if v.mode == ModePlaylists {
+		v.rebuild()
+	}
+}
 
 // rebuild recomputes the visible rows.
 func (v *libView) rebuild() {
 	v.nodes = v.nodes[:0]
-	if strings.TrimSpace(v.filter) != "" {
+	switch {
+	case strings.TrimSpace(v.filter) != "":
 		res := v.lib.Search(v.filter)
 		if len(res) > 300 {
 			res = res[:300]
@@ -68,7 +101,27 @@ func (v *libView) rebuild() {
 			r := res[i]
 			v.nodes = append(v.nodes, node{kind: r.Kind, result: &r, artist: r.Artist, album: r.Album, track: r.Track})
 		}
-	} else {
+	case v.mode == ModeAlbums:
+		for _, al := range v.lib.Albums() {
+			v.nodes = append(v.nodes, node{kind: library.KindAlbum, album: al, key: albumKey(al)})
+			if !v.expanded[albumKey(al)] {
+				continue
+			}
+			for _, t := range al.Tracks {
+				v.nodes = append(v.nodes, node{kind: library.KindTrack, depth: 1, track: t, album: al})
+			}
+		}
+	case v.mode == ModePlaylists:
+		for _, pl := range v.playlists {
+			v.nodes = append(v.nodes, node{kind: library.KindPlaylist, playlist: pl, key: playlistKey(pl)})
+			if !v.expanded[playlistKey(pl)] {
+				continue
+			}
+			for _, t := range pl.Tracks {
+				v.nodes = append(v.nodes, node{kind: library.KindTrack, depth: 1, track: t, playlist: pl})
+			}
+		}
+	default:
 		for _, ar := range v.lib.Artists {
 			v.nodes = append(v.nodes, node{kind: library.KindArtist, artist: ar, key: artistKey(ar)})
 			if !v.expanded[artistKey(ar)] {
@@ -98,6 +151,29 @@ func (v *libView) current() *node {
 		return nil
 	}
 	return &v.nodes[v.cursor]
+}
+
+// currentArtist returns the artist the cursor row belongs to (used for the
+// artist photo backdrop and the merge tool).
+func (v *libView) currentArtist() *library.Artist {
+	n := v.current()
+	if n == nil {
+		return nil
+	}
+	if n.artist != nil {
+		return n.artist
+	}
+	var name string
+	switch {
+	case n.album != nil:
+		name = n.album.Artist
+	case n.track != nil:
+		name = v.lib.Aliases.Resolve(n.track.AlbumArtist)
+	}
+	if name == "" {
+		return nil
+	}
+	return v.lib.FindArtist(name)
 }
 
 func (v *libView) move(d int) {
@@ -157,7 +233,9 @@ func (v *libView) revealTrack(t *library.Track) {
 		return
 	}
 	v.filter = ""
-	v.typing = false
+	if v.mode != ModeArtists {
+		v.setMode(ModeArtists)
+	}
 	for _, ar := range v.lib.Artists {
 		for _, al := range ar.Albums {
 			for _, tr := range al.Tracks {

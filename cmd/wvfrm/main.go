@@ -46,6 +46,8 @@ usage:
   wvfrm track <name>           play a single track (also: song)
   wvfrm shuffle [words]        shuffle the whole library, or the matches
   wvfrm all                    play the whole library in order
+  wvfrm playlist <name>        play a saved playlist
+  wvfrm playlists              list saved playlists
   wvfrm art <album words>      find cover art online and attach it (no UI)
   wvfrm path <dir>             set the music folder (default ~/Music)
   wvfrm scan                   rescan the music folder
@@ -127,6 +129,17 @@ func main() {
 			fmt.Printf("%-12s %s\n", v.Name(), v.Describe())
 		}
 		return
+	case "playlists":
+		lib := loadLibrary(cfg, false)
+		lists := lib.Playlists()
+		if len(lists) == 0 {
+			fmt.Printf("no playlists in %s\n", filepath.Join(cfg.MusicDir, library.PlaylistDir))
+			return
+		}
+		for _, p := range lists {
+			fmt.Printf("%-30s %d track(s)\n", p.Name, len(p.Tracks))
+		}
+		return
 	case "path":
 		if rest == "" {
 			fmt.Println(cfg.MusicDir)
@@ -200,6 +213,12 @@ func main() {
 	case "":
 	case "all":
 		queue = lib.AllTracks()
+	case "playlist":
+		if p := lib.FindPlaylist(rest); p != nil && len(p.Tracks) > 0 {
+			queue = p.Tracks
+		} else {
+			notFound = rest
+		}
 	case "shuffle":
 		shuffle = true
 		if rest == "" {
@@ -301,6 +320,9 @@ func loadLibrary(cfg config.Config, verbose bool) *library.Library {
 	lib, err := library.Load(cfg.MusicDir, cfg.CachePath, progress)
 	if err != nil {
 		fail("scan: %v", err)
+	}
+	if al := library.LoadAliases(cfg.AliasPath); al.Len() > 0 {
+		lib.SetAliases(al)
 	}
 	return lib
 }

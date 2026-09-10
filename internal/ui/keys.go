@@ -32,36 +32,8 @@ func (a *App) handleKey(e *tcell.EventKey) {
 		return
 	}
 
-	// Library filter typing mode.
-	if a.view == ViewLibrary && a.lv.typing {
-		switch key {
-		case tcell.KeyEscape:
-			a.lv.filter = ""
-			a.lv.typing = false
-			a.lv.rebuild()
-		case tcell.KeyEnter:
-			a.lv.typing = false
-			if a.lv.filter == "" {
-				a.lv.rebuild()
-			}
-		case tcell.KeyBackspace, tcell.KeyBackspace2:
-			if rs := []rune(a.lv.filter); len(rs) > 0 {
-				a.lv.filter = string(rs[:len(rs)-1])
-				a.lv.rebuild()
-			}
-		case tcell.KeyDown, tcell.KeyCtrlN:
-			a.lv.move(1)
-		case tcell.KeyUp, tcell.KeyCtrlP:
-			a.lv.move(-1)
-		case tcell.KeyCtrlC:
-			a.quit = true
-		case tcell.KeyCtrlK:
-			a.help = true
-		case tcell.KeyRune:
-			a.lv.filter += string(r)
-			a.lv.cursor = 0
-			a.lv.rebuild()
-		}
+	// A prompt (filter, playlist name, merge picker) takes all typing.
+	if a.promptKey(e) {
 		return
 	}
 
@@ -127,6 +99,11 @@ func (a *App) handleKey(e *tcell.EventKey) {
 	case tcell.KeyDelete, tcell.KeyBackspace, tcell.KeyBackspace2:
 		if a.view == ViewQueue {
 			a.queueRemove()
+		}
+		if a.view == ViewLibrary {
+			if n := a.lv.current(); n != nil && n.kind == library.KindPlaylist {
+				a.deletePlaylistPrompt(n.playlist)
+			}
 		}
 		return
 	case tcell.KeyRune:
@@ -202,10 +179,7 @@ func (a *App) handleKey(e *tcell.EventKey) {
 			a.showToast("reloading artwork from disk", false)
 		}
 	case '/':
-		a.switchView(ViewLibrary)
-		a.lv.typing = true
-		a.lv.filter = ""
-		a.lv.rebuild()
+		a.openFilter()
 	case 'o':
 		if t := a.pl.Current(); t != nil {
 			a.switchView(ViewLibrary)
@@ -298,6 +272,29 @@ func (a *App) activate() {
 
 func (a *App) libKey(r rune) {
 	switch r {
+	case 'b':
+		a.lv.filter = ""
+		a.lv.setMode(a.lv.mode + 1)
+		a.showToast("library: "+modeNames[a.lv.mode]+" (b to switch)", false)
+	case 'B':
+		a.lv.filter = ""
+		a.lv.setMode(a.lv.mode - 1)
+		a.showToast("library: "+modeNames[a.lv.mode]+" (b to switch)", false)
+	case 'M':
+		a.openMerge()
+	case 'P':
+		if n := a.lv.current(); n != nil {
+			what := "selection"
+			switch n.kind {
+			case library.KindArtist:
+				what = n.artist.Name
+			case library.KindAlbum:
+				what = n.album.Name
+			case library.KindTrack:
+				what = n.track.Title
+			}
+			a.savePlaylistPrompt(what, n.tracks())
+		}
 	case 'e':
 		if n := a.lv.current(); n != nil {
 			ts := n.tracks()
@@ -331,6 +328,9 @@ func (a *App) queueKey(r rune) {
 		a.pl.ClearQueue()
 		a.qCursor = 0
 		a.showToast("queue cleared", false)
+	case 'P':
+		tracks, _ := a.pl.Queue()
+		a.savePlaylistPrompt("queue", tracks)
 	case 'g':
 		_, pos := a.pl.Queue()
 		if pos >= 0 {

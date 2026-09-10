@@ -88,7 +88,9 @@ type App struct {
 	busy       string // background job description
 
 	// library view
-	lv libView
+	lv     libView
+	prompt prompt
+	pick   picker
 
 	// queue view
 	qCursor, qScroll int

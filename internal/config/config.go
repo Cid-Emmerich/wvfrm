@@ -53,6 +53,7 @@ type Config struct {
 	// Misc
 	CachePath  string
 	ConfigPath string
+	AliasPath  string // artist merges (see library.Aliases)
 }
 
 // Default returns the baseline configuration.
@@ -84,6 +85,7 @@ func Default() Config {
 		VisFPS:       30,
 		CachePath:    filepath.Join(cacheDir(), "library.json"),
 		ConfigPath:   filepath.Join(configDir(), "wvfrmrc"),
+		AliasPath:    filepath.Join(configDir(), "aliases"),
 	}
 }
 

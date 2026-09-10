@@ -12,6 +12,7 @@ const (
 	KindArtist Kind = iota
 	KindAlbum
 	KindTrack
+	KindPlaylist
 )
 
 func (k Kind) String() string {
@@ -20,6 +21,8 @@ func (k Kind) String() string {
 		return "artist"
 	case KindAlbum:
 		return "album"
+	case KindPlaylist:
+		return "playlist"
 	default:
 		return "track"
 	}

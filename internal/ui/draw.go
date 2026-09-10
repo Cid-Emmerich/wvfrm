@@ -438,10 +438,12 @@ func (a *App) drawStatus(w, y int, st audio.Status) {
 // drawBottomLine shows the toast or a short hint.
 func (a *App) drawBottomLine(w, h int) {
 	y := h - 1
-	if a.view == ViewLibrary && a.lv.typing {
-		a.puts(1, y, "/"+a.lv.filter+"▏", a.st(a.th.Accent), w-2)
-		hint := "enter: keep filter · esc: clear"
-		a.puts(w-len(hint)-1, y, hint, a.st(a.th.Muted), w)
+	if p := &a.prompt; p.active {
+		x := 1 + a.puts(1, y, p.label, a.st(a.th.Secondary), w-2)
+		x += a.puts(x, y, p.text+"▏", a.st(a.th.Accent), w-x-1)
+		if hw := len([]rune(p.hint)); p.hint != "" && x+hw+2 < w {
+			a.puts(w-hw-1, y, p.hint, a.st(a.th.Muted), w)
+		}
 		return
 	}
 	if a.toast != "" && time.Now().Before(a.toastTill) {
@@ -461,9 +463,10 @@ func (a *App) drawBottomLine(w, h int) {
 		}
 		keys = []string{"j/k/l prev/play/next", mode, "s shuffle", "f crossfade", "t theme", "ctrl+k help"}
 	case ViewLibrary:
-		keys = []string{"↑/↓ →/← browse", "enter play", "e queue", "/ filter", "ctrl+k help"}
+		next := modeNames[(a.lv.mode+1)%len(modeNames)]
+		keys = []string{"↑/↓ →/← browse", "enter play", "e queue", "b " + next, "/ filter", "M merge", "ctrl+k help"}
 	case ViewQueue:
-		keys = []string{"↑/↓ move", "enter jump", "x remove", "C clear", "ctrl+k help"}
+		keys = []string{"↑/↓ move", "enter jump", "x remove", "P save playlist", "C clear", "ctrl+k help"}
 	}
 	a.drawKeyHints(1, y, w-2, keys)
 }
@@ -490,6 +493,10 @@ func (a *App) drawKeyHints(x, y, maxW int, keys []string) {
 // Library
 
 func (a *App) drawLibrary(w, h int) {
+	if a.pick.active {
+		a.drawPicker(w, h)
+		return
+	}
 	rows := h - 3 // rows 1..h-3
 	v := &a.lv
 	if v.cursor < v.scroll {
@@ -545,13 +552,24 @@ func (a *App) drawLibrary(w, h int) {
 				extra = fmt.Sprintf("%d · ", n.album.Year)
 			}
 			extra += fmt.Sprintf("%d track(s)", len(n.album.Tracks))
-			if n.result != nil {
+			if n.result != nil || v.mode == ModeAlbums {
 				extra = n.album.Artist + " · " + extra
 			}
 			labelStyle = a.st(a.th.Secondary)
 			if idx == v.cursor {
 				labelStyle = labelStyle.Background(tc(a.th.Select))
 			}
+		case library.KindPlaylist:
+			arrow := "▸ "
+			if v.expanded[n.key] {
+				arrow = "▾ "
+			}
+			label = arrow + "♫ " + n.playlist.Name
+			extra = fmt.Sprintf("%d track(s)", len(n.playlist.Tracks))
+			if n.playlist.Missing > 0 {
+				extra += fmt.Sprintf(" · %d missing", n.playlist.Missing)
+			}
+			labelStyle = base.Bold(true)
 		default:
 			num := "  "
 			if n.track.TrackNo > 0 {
@@ -585,8 +603,11 @@ func (a *App) drawLibrary(w, h int) {
 	}
 	if len(v.nodes) == 0 {
 		msg := "no matches"
-		if len(a.lib.Tracks) == 0 {
+		switch {
+		case len(a.lib.Tracks) == 0:
 			msg = "library is empty – run: wvfrm path /your/music"
+		case v.filter == "" && v.mode == ModePlaylists:
+			msg = "no playlists yet – press P in the queue (or on an artist or album) to save one"
 		}
 		a.puts(2, 2, msg, a.st(a.th.Muted), w)
 	}
@@ -596,9 +617,57 @@ func (a *App) drawLibrary(w, h int) {
 		albums += len(ar.Albums)
 	}
 	status := fmt.Sprintf("%d artists · %d albums · %d tracks · %s", len(a.lib.Artists), albums, len(a.lib.Tracks), a.cfg.MusicDir)
-	if v.filter != "" {
+	switch {
+	case v.filter != "":
 		status = fmt.Sprintf("%d result(s) for \"%s\" · %s", len(v.nodes), v.filter, status)
+	case v.mode == ModePlaylists:
+		status = fmt.Sprintf("%d playlist(s) in %s · %s", len(v.playlists), library.PlaylistDir, status)
 	}
+	x := 1 + a.puts(1, h-2, "["+modeNames[v.mode]+"] ", a.st(a.th.Accent), w-2)
+	a.puts(x, h-2, fit(status, w-x-1), a.st(a.th.Muted), w-x-1)
+}
+
+// drawPicker lists candidate artists for the merge tool.
+func (a *App) drawPicker(w, h int) {
+	rows := h - 3
+	pk := &a.pick
+	if pk.cursor < pk.scroll {
+		pk.scroll = pk.cursor
+	}
+	if pk.cursor >= pk.scroll+rows-1 {
+		pk.scroll = pk.cursor - rows + 2
+	}
+	if pk.scroll < 0 {
+		pk.scroll = 0
+	}
+	title := fmt.Sprintf("choose the artist to keep – %q will be filed under it", pk.from.Name)
+	a.puts(1, 1, fit(title, w-2), a.st(a.th.Secondary).Bold(true), w-2)
+	for i := 0; i < rows-1; i++ {
+		idx := pk.scroll + i
+		if idx >= len(pk.items) {
+			break
+		}
+		ar := pk.items[idx]
+		y := 2 + i
+		style := a.st(a.th.Text)
+		muted := a.st(a.th.Muted)
+		if idx == pk.cursor {
+			style = style.Background(tc(a.th.Select)).Bold(true)
+			muted = muted.Background(tc(a.th.Select))
+			a.fillRow(y, 0, w, style)
+		}
+		n := 0
+		for _, al := range ar.Albums {
+			n += len(al.Tracks)
+		}
+		extra := fmt.Sprintf("%d album(s) · %d track(s)", len(ar.Albums), n)
+		a.puts(w-len(extra)-1, y, extra, muted, w)
+		a.puts(3, y, fit(ar.Name, w-len(extra)-6), style, w-len(extra)-6)
+	}
+	if len(pk.items) == 0 {
+		a.puts(3, 2, "no artist matches", a.st(a.th.Muted), w)
+	}
+	status := fmt.Sprintf("%d candidate(s) · likely duplicates are listed first", len(pk.items))
 	a.puts(1, h-2, fit(status, w-2), a.st(a.th.Muted), w-2)
 }
 
