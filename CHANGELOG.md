@@ -16,6 +16,35 @@ go build -o wvfrm ./cmd/wvfrm
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-10
+
+### Added
+- Mac media keys: play/pause, next and previous from the keyboard, Control
+  Centre and headphones; the Now Playing widget shows the track and cover.
+- Album and playlist browsing in the library (`b` switches modes).
+- Playlists: `P` saves the queue or the library selection as an `.m3u8`
+  file in `<music>/Playlists`; `wvfrm playlist <name>` plays one.
+- Artist merge tool (`M`) for duplicate artists: rewrites artist tags in
+  the files and records the merge in `~/.config/wvfrm/aliases`.
+- Artist photos, fetched together with the cover by `d`, shown dimmed
+  behind the library list.
+- A small spectrum under the track details in album-art mode.
+- Lyrics pane (`y`): `.lrc` files, embedded lyrics, or whisper.cpp
+  transcription with the current line highlighted.
+- Visualizers: `matrix` (digital rain), `skate`, `flock` and `macos`.
+- `ctrl+s` saves settings without quitting.
+- Homebrew tap: `brew install Cid-Emmerich/wvfrm/wvfrm`.
+- `scripts/testmusic.sh` generates the test library.
+
+### Changed
+- Playback keys are now `j` / `k` / `l` (previous / play-pause / next)
+  in every view; lists move with the arrow keys. `space` still pauses.
+- The hint line under each view shows only the essentials, separated by
+  `∿`; everything else is in the `ctrl+k` help.
+- The old LED-panel `matrix` visualizer is now called `led`.
+- Mirror moved from `y` to `Y` (`y` is lyrics).
+- New config keys: `lyrics`, `whisper_model`.
+
 ## [1.0.0] - 2026-09-09
 
 First release.
@@ -34,5 +63,6 @@ First release.
 - Themes: twelve built in plus `match`, derived from the album art.
 - ctrl+k help overlay; settings saved on quit.
 
-[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.0.0
