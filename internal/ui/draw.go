@@ -452,20 +452,38 @@ func (a *App) drawBottomLine(w, h int) {
 		a.puts(1, y, fit(a.toast, w-2), style, w-2)
 		return
 	}
-	var hint string
+	var keys []string
 	switch a.view {
 	case ViewNow:
-		if a.showArt {
-			hint = "space play/pause · n/b next/prev · ←/→ seek · a visualizer · A art style · t theme · d find art · / search"
-		} else {
-			hint = "space play/pause · n/b next/prev · v/V style · g gradient · i fill · x peaks · y mirror · a album art · t theme"
+		mode := "a visualizer"
+		if !a.showArt {
+			mode = "v style · a art"
 		}
+		keys = []string{"j/k/l prev/play/next", mode, "s shuffle", "f crossfade", "t theme", "ctrl+k help"}
 	case ViewLibrary:
-		hint = "↑/↓ move · →/← open/close · enter play · e add to queue · E play next · / filter · z fold all · S rescan"
+		keys = []string{"↑/↓ →/← browse", "enter play", "e queue", "/ filter", "ctrl+k help"}
 	case ViewQueue:
-		hint = "↑/↓ move · enter jump · x remove · C clear · g go to current · s shuffle mode"
+		keys = []string{"↑/↓ move", "enter jump", "x remove", "C clear", "ctrl+k help"}
 	}
-	a.puts(1, y, fit(hint, w-2), a.st(a.th.Muted), w-2)
+	a.drawKeyHints(1, y, w-2, keys)
+}
+
+// keySep separates shortcuts in the hint line: a little wave, for wvfrm.
+const keySep = " ∿ "
+
+// drawKeyHints writes "key desc ∿ key desc …" with the keys highlighted.
+func (a *App) drawKeyHints(x, y, maxW int, keys []string) {
+	for i, k := range keys {
+		if i > 0 {
+			x += a.puts(x, y, keySep, a.st(a.th.Accent), maxW-x)
+		}
+		name, desc, _ := strings.Cut(k, " ")
+		x += a.puts(x, y, name, a.st(a.th.Text), maxW-x)
+		x += a.puts(x, y, " "+desc, a.st(a.th.Muted), maxW-x)
+		if x >= maxW {
+			return
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

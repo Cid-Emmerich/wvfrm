@@ -73,6 +73,10 @@ func (a *App) handleKey(e *tcell.EventKey) {
 	case tcell.KeyCtrlC:
 		a.quit = true
 		return
+	case tcell.KeyCtrlS:
+		a.saveConfig()
+		a.showToast("settings saved to "+a.cfg.ConfigPath, false)
+		return
 	case tcell.KeyTab:
 		a.switchView((a.view + 1) % 3)
 		return
@@ -143,11 +147,11 @@ func (a *App) handleKey(e *tcell.EventKey) {
 		a.switchView(ViewLibrary)
 	case '3':
 		a.switchView(ViewQueue)
-	case ' ':
+	case 'k', ' ':
 		a.pl.TogglePause()
-	case 'n', '>':
+	case 'l', '>':
 		a.pl.Next()
-	case 'b', 'p', '<':
+	case 'j', '<':
 		a.pl.Prev()
 	case '+', '=':
 		a.pl.VolumeDelta(0.05)
@@ -294,14 +298,6 @@ func (a *App) activate() {
 
 func (a *App) libKey(r rune) {
 	switch r {
-	case 'j':
-		a.lv.move(1)
-	case 'k':
-		a.lv.move(-1)
-	case 'h':
-		a.lv.collapse()
-	case 'l':
-		a.lv.expand()
 	case 'e':
 		if n := a.lv.current(); n != nil {
 			ts := n.tracks()
@@ -329,10 +325,6 @@ func (a *App) libKey(r rune) {
 
 func (a *App) queueKey(r rune) {
 	switch r {
-	case 'j':
-		a.listMove(1, 0)
-	case 'k':
-		a.listMove(-1, 0)
 	case 'x':
 		a.queueRemove()
 	case 'C':
