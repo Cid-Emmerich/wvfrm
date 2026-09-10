@@ -171,6 +171,8 @@ func (a *App) handleKey(e *tcell.EventKey) {
 		a.cycleTheme(1)
 	case 'T':
 		a.cycleTheme(-1)
+	case 'y':
+		a.toggleLyrics()
 	case 'd':
 		a.findArtOnline()
 	case 'D':
@@ -369,7 +371,7 @@ func (a *App) visKey(r rune) {
 	case 'x':
 		o.Peaks = !o.Peaks
 		a.showToast("peaks: "+onOff(o.Peaks), false)
-	case 'y':
+	case 'Y':
 		o.Mirror = !o.Mirror
 		a.showToast("mirror: "+onOff(o.Mirror), false)
 	case 'z':

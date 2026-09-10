@@ -240,3 +240,64 @@ func TestArtistBackdrop(t *testing.T) {
 		t.Error("backdrop should be gone for an artist without a photo")
 	}
 }
+
+// TestLyricsPane shows an .lrc file beside the visualizer and art.
+func TestLyricsPane(t *testing.T) {
+	root := os.Getenv("WVFRM_TEST_MUSIC")
+	if root == "" {
+		t.Skip("set WVFRM_TEST_MUSIC")
+	}
+	tmp := t.TempDir()
+	copyTree(t, root, tmp)
+	os.WriteFile(filepath.Join(tmp, "Aurora Fields", "Night Signals", "01 Signal Lost.lrc"),
+		[]byte("[00:00.00]Static on the line\n[00:02.00]Signal lost tonight\n[00:04.00]Calling out again\n"), 0o644)
+	lib, _ := library.Load(tmp, filepath.Join(t.TempDir(), "c.json"), nil)
+	cfg := config.Default()
+	cfg.MusicDir = tmp
+	cfg.CachePath = filepath.Join(t.TempDir(), "cache.json")
+	cfg.ShowArt = false
+	pl := audio.New()
+	defer pl.Close()
+	pl.SetQueue(lib.Best("night signals", library.KindAlbum).Album.Tracks, 0)
+	scr := tcell.NewSimulationScreen("UTF-8")
+	scr.Init()
+	scr.SetSize(100, 24)
+	a := New(&cfg, lib, pl)
+	a.scr = scr
+	a.lastTrack = pl.Current()
+	key(a, 'y')
+	if !a.showLyrics || a.view != ViewNow {
+		t.Fatal("y should show lyrics in the now-playing view")
+	}
+	for i := 0; i < 100 && a.lyr == nil; i++ {
+		if ev := scr.PollEvent(); ev != nil {
+			a.handle(ev)
+		}
+	}
+	if a.lyr == nil || a.lyr.Source != "lrc:01 Signal Lost.lrc" {
+		t.Fatalf("lyrics not loaded: %+v %s", a.lyr, a.lyrStatus)
+	}
+	a.draw()
+	txt := screenText(scr)
+	for _, want := range []string{"lyrics · lrc", "Static on the line", "Signal lost tonight", "Calling out again"} {
+		if !strings.Contains(txt, want) {
+			t.Errorf("pane missing %q\n%s", want, txt)
+		}
+	}
+	// art mode shares the row with the pane too
+	key(a, 'a')
+	a.draw()
+	if !strings.Contains(screenText(scr), "Static on the line") {
+		t.Errorf("lyrics gone in art mode\n%s", screenText(scr))
+	}
+	key(a, 'y')
+	a.draw()
+	if strings.Contains(screenText(scr), "Static on the line") {
+		t.Error("lyrics still shown after toggling off")
+	}
+	a.saveConfig()
+	data, _ := os.ReadFile(cfg.ConfigPath)
+	if !strings.Contains(string(data), "lyrics = false") || !strings.Contains(string(data), "whisper_model = small") {
+		t.Errorf("config:\n%s", data)
+	}
+}

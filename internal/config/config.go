@@ -50,6 +50,10 @@ type Config struct {
 	VisStereo    bool    // split channels
 	VisFPS       int
 
+	// Lyrics
+	Lyrics       bool   // show the lyrics pane
+	WhisperModel string // whisper.cpp model name (tiny, base, small, medium, large-v3-turbo) or a path
+
 	// Misc
 	CachePath  string
 	ConfigPath string
@@ -83,6 +87,8 @@ func Default() Config {
 		VisLogScale:  true,
 		VisStereo:    false,
 		VisFPS:       30,
+		Lyrics:       false,
+		WhisperModel: "small",
 		CachePath:    filepath.Join(cacheDir(), "library.json"),
 		ConfigPath:   filepath.Join(configDir(), "wvfrmrc"),
 		AliasPath:    filepath.Join(configDir(), "aliases"),
@@ -192,6 +198,12 @@ func (c *Config) set(k, v string) {
 		c.VisStereo = b()
 	case "vis_fps":
 		c.VisFPS = i()
+	case "lyrics":
+		c.Lyrics = b()
+	case "whisper_model":
+		if v != "" {
+			c.WhisperModel = v
+		}
 	}
 }
 
@@ -235,6 +247,8 @@ func (c Config) Save() error {
 		"vis_log_scale": fmt.Sprint(c.VisLogScale),
 		"vis_stereo":    fmt.Sprint(c.VisStereo),
 		"vis_fps":       fmt.Sprint(c.VisFPS),
+		"lyrics":        fmt.Sprint(c.Lyrics),
+		"whisper_model": c.WhisperModel,
 	}
 	keys := make([]string, 0, len(kv))
 	for k := range kv {

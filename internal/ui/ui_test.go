@@ -109,7 +109,7 @@ func TestUIWalkthrough(t *testing.T) {
 			key(a, 'i')
 			a.draw()
 		}
-		for _, r := range "xyzLwWeE,.[];'" {
+		for _, r := range "xYzLwWeE,.[];'" {
 			key(a, r)
 			a.draw()
 		}

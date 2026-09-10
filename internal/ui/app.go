@@ -12,6 +12,7 @@ import (
 	"github.com/Cid-Emmerich/wvfrm/internal/audio"
 	"github.com/Cid-Emmerich/wvfrm/internal/config"
 	"github.com/Cid-Emmerich/wvfrm/internal/library"
+	"github.com/Cid-Emmerich/wvfrm/internal/lyrics"
 	"github.com/Cid-Emmerich/wvfrm/internal/mediakeys"
 	"github.com/Cid-Emmerich/wvfrm/internal/theme"
 	"github.com/Cid-Emmerich/wvfrm/internal/vis"
@@ -102,6 +103,13 @@ type App struct {
 	miniVis    vis.Mini
 	miniCanvas *vis.Canvas
 
+	// lyrics pane
+	showLyrics bool
+	lyr        *lyrics.Lyrics
+	lyrTrack   *library.Track
+	lyrStatus  string
+	mainW      int // width left for art/visualizer beside the lyrics pane
+
 	// queue view
 	qCursor, qScroll int
 
@@ -133,6 +141,7 @@ func New(cfg *config.Config, lib *library.Library, pl *audio.Player) *App {
 		visOpts:    vis.OptionsFromConfig(*cfg),
 		visIdx:     vis.Index(cfg.Vis),
 		showArt:    cfg.ShowArt,
+		showLyrics: cfg.Lyrics,
 		artMode:    cfg.ArtMode,
 		charset:    cfg.ASCIICharset,
 		visStart:   time.Now(),
@@ -213,6 +222,9 @@ func (a *App) RunWith(scr tcell.Screen, startView View) error {
 	defer mediakeys.Clear()
 	if t := a.pl.Current(); t != nil {
 		a.requestArt(t)
+		if a.showLyrics {
+			a.requestLyrics(t)
+		}
 	}
 
 	fps := a.cfg.VisFPS
@@ -252,6 +264,7 @@ func (a *App) saveConfig() {
 	c := a.cfg
 	st := a.pl.Status()
 	c.ShowArt = a.showArt
+	c.Lyrics = a.showLyrics
 	c.ArtMode = a.artMode
 	c.ASCIICharset = a.charset
 	c.Theme = a.themeNames[a.themeIdx]
@@ -295,6 +308,12 @@ func (a *App) handle(ev tcell.Event) {
 				a.forgetPhoto(d.name)
 			} else {
 				a.onPhotoResult(d)
+			}
+		case lyricsResult:
+			a.onLyricsResult(d)
+		case lyricsStatus:
+			if d.track == a.lyrTrack {
+				a.lyrStatus = d.msg
 			}
 		}
 	}
@@ -369,6 +388,9 @@ func (a *App) onTrackChange() {
 		return
 	}
 	a.requestArt(t)
+	if a.showLyrics {
+		a.requestLyrics(t)
+	}
 	if st := a.pl.Status(); st.Error != "" {
 		a.showToast(st.Error, true)
 	}

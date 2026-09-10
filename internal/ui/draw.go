@@ -126,17 +126,23 @@ func (a *App) drawNow(w, h int) {
 	progressRow := h - 3
 	a.mouseSeekRow = progressRow
 
+	pw := a.lyricsPaneWidth(w)
+	mw := w - pw
+	a.mainW = mw
 	if st.Track == nil {
 		a.drawIdle(w, h, mainTop, mainH)
 	} else if a.showArt {
-		a.drawArtLayout(w, mainTop, mainH, st)
+		a.drawArtLayout(mw, mainTop, mainH, st)
 	} else {
-		a.drawVisualizer(w, mainTop, mainH, st)
+		a.drawVisualizer(mw, mainTop, mainH, st)
 		info := st.Track.Title + "  ·  " + st.Track.Artist
 		if st.Track.Album != "" {
 			info += "  ·  " + st.Track.Album
 		}
-		a.puts(2, infoRow, fit(info, w-4), a.st(a.th.Text).Bold(true), w-4)
+		a.puts(2, infoRow, fit(info, mw-4), a.st(a.th.Text).Bold(true), mw-4)
+	}
+	if pw > 0 && st.Track != nil {
+		a.drawLyrics(mw, mainTop, pw-1, mainH, st.Position)
 	}
 	a.drawProgress(w, progressRow, st)
 	a.drawStatus(w, h-2, st)
@@ -476,7 +482,7 @@ func (a *App) drawBottomLine(w, h int) {
 		if !a.showArt {
 			mode = "v style · a art"
 		}
-		keys = []string{"j/k/l prev/play/next", mode, "s shuffle", "f crossfade", "t theme", "ctrl+k help"}
+		keys = []string{"j/k/l prev/play/next", mode, "s shuffle", "f crossfade", "t theme", "y lyrics", "ctrl+k help"}
 	case ViewLibrary:
 		next := modeNames[(a.lv.mode+1)%len(modeNames)]
 		keys = []string{"↑/↓ →/← browse", "enter play", "e queue", "b " + next, "/ filter", "M merge", "ctrl+k help"}
@@ -858,6 +864,9 @@ func (a *App) drawKitty(w, h int) {
 		return
 	}
 	mh := h - 5
+	if a.mainW > 0 {
+		w = a.mainW
+	}
 	maxW := max(w/2-4, 8)
 	maxH := max(mh-2, 4)
 	aw, ah := art.Fit(a.curArt.Image, maxW, maxH)
