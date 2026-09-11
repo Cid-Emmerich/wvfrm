@@ -19,9 +19,9 @@ func typeText(a *App, s string) {
 	}
 }
 
-// TestLibraryModesPlaylistsMerge drives the album/playlist browse modes,
-// saves a playlist through the prompt and merges two artists.
-func TestLibraryModesPlaylistsMerge(t *testing.T) {
+// TestLibraryModesPlaylists drives the album/playlist browse modes and
+// saves a playlist through the prompt.
+func TestLibraryModesPlaylists(t *testing.T) {
 	root := os.Getenv("WVFRM_TEST_MUSIC")
 	if root == "" {
 		t.Skip("set WVFRM_TEST_MUSIC")
@@ -35,7 +35,6 @@ func TestLibraryModesPlaylistsMerge(t *testing.T) {
 	cfg := config.Default()
 	cfg.MusicDir = tmp
 	cfg.ConfigPath = filepath.Join(t.TempDir(), "rc")
-	cfg.AliasPath = filepath.Join(t.TempDir(), "aliases")
 	cfg.CachePath = filepath.Join(t.TempDir(), "cache.json")
 	pl := audio.New()
 	defer pl.Close()
@@ -106,51 +105,6 @@ func TestLibraryModesPlaylistsMerge(t *testing.T) {
 	if lists := lib.Playlists(); len(lists) != 1 {
 		t.Errorf("expected 1 playlist after delete, got %d", len(lists))
 	}
-
-	// merge "The Static Choir" into "Aurora Fields" through the picker
-	a.lv.setMode(ModeArtists)
-	for i, n := range a.lv.nodes {
-		if n.artist != nil && n.artist.Name == "The Static Choir" {
-			a.lv.cursor = i
-		}
-	}
-	key(a, 'M')
-	a.draw()
-	if !a.pick.active || !strings.Contains(screenText(scr), "choose the artist to keep") {
-		t.Fatalf("merge picker not open\n%s", screenText(scr))
-	}
-	typeText(a, "aurora")
-	if len(a.pick.items) != 1 || a.pick.items[0].Name != "Aurora Fields" {
-		t.Fatalf("picker filter: %+v", a.pick.items)
-	}
-	special(a, tcell.KeyEnter) // choose
-	if !a.prompt.active || !strings.Contains(a.prompt.label, "rewrite tags in 2 file(s)") {
-		t.Fatalf("confirmation prompt missing: %+v", a.prompt)
-	}
-	typeText(a, "y")
-	special(a, tcell.KeyEnter)
-	// wait for the background tag rewrite
-	for i := 0; i < 200 && a.busy != ""; i++ {
-		if ev := scr.PollEvent(); ev != nil {
-			a.handle(ev)
-		}
-	}
-	if lib.FindArtist("The Static Choir") != nil || lib.FindArtist("Aurora Fields") == nil {
-		t.Error("library not regrouped after merge")
-	}
-	if len(lib.FindArtist("Aurora Fields").Albums) != 3 {
-		t.Errorf("merged artist has %d albums", len(lib.FindArtist("Aurora Fields").Albums))
-	}
-	// tags rewritten on disk: a fresh scan without aliases still groups them
-	fresh, _ := library.Load(tmp, filepath.Join(t.TempDir(), "c2.json"), nil)
-	if fresh.FindArtist("The Static Choir") != nil {
-		t.Error("tags were not rewritten in the files")
-	}
-	data, _ := os.ReadFile(cfg.AliasPath)
-	if !strings.Contains(string(data), "the static choir = Aurora Fields") {
-		t.Errorf("alias file:\n%s", data)
-	}
-	a.draw()
 }
 
 func copyTree(t *testing.T, src, dst string) {
@@ -189,6 +143,7 @@ func TestArtistBackdrop(t *testing.T) {
 	lib, _ := library.Load(tmp, filepath.Join(t.TempDir(), "c.json"), nil)
 	cfg := config.Default()
 	cfg.MusicDir = tmp
+	cfg.ConfigPath = filepath.Join(t.TempDir(), "rc")
 	cfg.CachePath = filepath.Join(t.TempDir(), "cache.json")
 	pl := audio.New()
 	defer pl.Close()
@@ -254,6 +209,7 @@ func TestLyricsPane(t *testing.T) {
 	lib, _ := library.Load(tmp, filepath.Join(t.TempDir(), "c.json"), nil)
 	cfg := config.Default()
 	cfg.MusicDir = tmp
+	cfg.ConfigPath = filepath.Join(t.TempDir(), "rc")
 	cfg.CachePath = filepath.Join(t.TempDir(), "cache.json")
 	cfg.ShowArt = false
 	pl := audio.New()

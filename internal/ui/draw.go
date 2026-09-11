@@ -485,7 +485,7 @@ func (a *App) drawBottomLine(w, h int) {
 		keys = []string{"j/k/l prev/play/next", mode, "s shuffle", "f crossfade", "t theme", "y lyrics", "ctrl+k help"}
 	case ViewLibrary:
 		next := modeNames[(a.lv.mode+1)%len(modeNames)]
-		keys = []string{"↑/↓ →/← browse", "enter play", "e queue", "b " + next, "/ filter", "M merge", "ctrl+k help"}
+		keys = []string{"↑/↓ →/← browse", "enter play", "e queue", "b " + next, "/ filter", "ctrl+k help"}
 	case ViewQueue:
 		keys = []string{"↑/↓ move", "enter jump", "x remove", "P save playlist", "C clear", "ctrl+k help"}
 	}
@@ -514,10 +514,6 @@ func (a *App) drawKeyHints(x, y, maxW int, keys []string) {
 // Library
 
 func (a *App) drawLibrary(w, h int) {
-	if a.pick.active {
-		a.drawPicker(w, h)
-		return
-	}
 	rows := h - 3 // rows 1..h-3
 	v := &a.lv
 	if v.cursor < v.scroll {
@@ -593,14 +589,10 @@ func (a *App) drawLibrary(w, h int) {
 			}
 			labelStyle = base.Bold(true)
 		default:
-			num := "  "
-			if n.track.TrackNo > 0 {
-				num = fmt.Sprintf("%2d", n.track.TrackNo)
-			}
-			label = num + "  " + n.track.Title
+			label = "    " + n.track.FileName()
 			if n.result != nil {
-				label = "♪ " + n.track.Title
-				extra = n.track.Artist + " · " + n.track.Album
+				label = "♪ " + n.track.FileName()
+				extra = n.result.Detail
 			}
 			if n.track.Duration > 0 {
 				extra = fmtTime(n.track.Duration)
@@ -610,7 +602,9 @@ func (a *App) drawLibrary(w, h int) {
 				if idx == v.cursor {
 					labelStyle = labelStyle.Background(tc(a.th.Select))
 				}
-				label = "♪" + label[1:]
+				if n.result == nil {
+					label = "  ♪ " + n.track.FileName()
+				}
 			}
 		}
 		avail := w - x - 1
@@ -669,50 +663,6 @@ func (a *App) applyBackdrop(w, y0, rows, skipRow int) {
 			a.scr.SetContent(x, y0+y, ch, comb, style.Background(tc(cells[y][x])))
 		}
 	}
-}
-
-// drawPicker lists candidate artists for the merge tool.
-func (a *App) drawPicker(w, h int) {
-	rows := h - 3
-	pk := &a.pick
-	if pk.cursor < pk.scroll {
-		pk.scroll = pk.cursor
-	}
-	if pk.cursor >= pk.scroll+rows-1 {
-		pk.scroll = pk.cursor - rows + 2
-	}
-	if pk.scroll < 0 {
-		pk.scroll = 0
-	}
-	title := fmt.Sprintf("choose the artist to keep – %q will be filed under it", pk.from.Name)
-	a.puts(1, 1, fit(title, w-2), a.st(a.th.Secondary).Bold(true), w-2)
-	for i := 0; i < rows-1; i++ {
-		idx := pk.scroll + i
-		if idx >= len(pk.items) {
-			break
-		}
-		ar := pk.items[idx]
-		y := 2 + i
-		style := a.st(a.th.Text)
-		muted := a.st(a.th.Muted)
-		if idx == pk.cursor {
-			style = style.Background(tc(a.th.Select)).Bold(true)
-			muted = muted.Background(tc(a.th.Select))
-			a.fillRow(y, 0, w, style)
-		}
-		n := 0
-		for _, al := range ar.Albums {
-			n += len(al.Tracks)
-		}
-		extra := fmt.Sprintf("%d album(s) · %d track(s)", len(ar.Albums), n)
-		a.puts(w-len(extra)-1, y, extra, muted, w)
-		a.puts(3, y, fit(ar.Name, w-len(extra)-6), style, w-len(extra)-6)
-	}
-	if len(pk.items) == 0 {
-		a.puts(3, 2, "no artist matches", a.st(a.th.Muted), w)
-	}
-	status := fmt.Sprintf("%d candidate(s) · likely duplicates are listed first", len(pk.items))
-	a.puts(1, h-2, fit(status, w-2), a.st(a.th.Muted), w-2)
 }
 
 // ---------------------------------------------------------------------------

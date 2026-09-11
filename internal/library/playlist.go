@@ -15,9 +15,9 @@ const PlaylistDir = "Playlists"
 
 // Playlist is a saved list of tracks.
 type Playlist struct {
-	Name   string
-	Path   string
-	Tracks []*Track
+	Name    string
+	Path    string
+	Tracks  []*Track
 	Missing int // lines that no longer match a file in the library
 }
 
@@ -42,7 +42,7 @@ func (l *Library) Playlists() []*Playlist {
 		}
 		out = append(out, pl)
 	}
-	sort.SliceStable(out, func(i, j int) bool { return sortKey(out[i].Name) < sortKey(out[j].Name) })
+	sort.SliceStable(out, func(i, j int) bool { return naturalLess(out[i].Name, out[j].Name) })
 	return out
 }
 

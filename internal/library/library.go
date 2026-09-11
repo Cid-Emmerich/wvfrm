@@ -1,5 +1,6 @@
-// Package library scans a music directory into Artists > Albums > Tracks,
-// caches the result, and answers searches such as `wvfrm <artist|album|track>`.
+// Package library scans a music directory into Artists > Albums > Tracks
+// that mirror the folder layout on disk, caches the tags it reads, and
+// answers searches such as `wvfrm <artist|album|track>`.
 package library
 
 import (
@@ -15,7 +16,8 @@ import (
 	"github.com/dhowden/tag"
 )
 
-// Track is a single audio file.
+// Track is a single audio file. Its tags are read for the now-playing
+// details and for search; where it sits in the library follows the folders.
 type Track struct {
 	Path        string  `json:"path"`
 	Title       string  `json:"title"`
@@ -32,18 +34,27 @@ type Track struct {
 	Size        int64   `json:"size"`
 }
 
-// Album groups tracks that share an album name and album artist.
+// FileName is the file's name without its extension, as the library lists it.
+func (t *Track) FileName() string {
+	return strings.TrimSuffix(filepath.Base(t.Path), filepath.Ext(t.Path))
+}
+
+// Album is one folder of tracks. Name is the folder's path below the artist
+// folder: "Night Signals", or "Box Set/Disc 2" when it is nested deeper.
+// Files that sit directly in an artist folder form an album named after it.
 type Album struct {
 	Name   string
 	Artist string
-	Year   int
+	Year   int // from the tracks' tags, shown beside the name
 	Dir    string
 	Tracks []*Track
 }
 
-// Artist groups albums.
+// Artist is a top-level folder in the music root. Files that sit directly
+// in the root are grouped under the root folder's own name.
 type Artist struct {
 	Name   string
+	Dir    string
 	Albums []*Album
 }
 
@@ -54,14 +65,7 @@ type Library struct {
 	Tracks    []*Track  `json:"tracks"`
 
 	Artists []*Artist `json:"-"`
-	Aliases *Aliases  `json:"-"` // artist merges, see alias.go
 	byPath  map[string]*Track
-}
-
-// SetAliases installs the artist alias table and regroups the library.
-func (l *Library) SetAliases(a *Aliases) {
-	l.Aliases = a
-	l.build()
 }
 
 // Supported audio extensions. Native decoders cover the first four; anything
@@ -212,55 +216,66 @@ func ReadTrack(p, root string) *Track {
 	return t
 }
 
-// build regroups Tracks into Artists/Albums.
+// build regroups Tracks into Artists > Albums following the folders:
+// the first folder below the root is the artist, the folder the file sits
+// in is the album, and tracks are listed in file-name order.
 func (l *Library) build() {
-	type key struct{ artist, album string }
-	albums := map[key]*Album{}
-	artists := map[string]*Artist{}
+	albums := map[string]*Album{}   // by folder
+	artists := map[string]*Artist{} // by folder
 	for _, t := range l.Tracks {
-		artistName := l.Aliases.Resolve(t.AlbumArtist)
-		k := key{norm(artistName), norm(t.Album)}
-		a, ok := albums[k]
+		dir := filepath.Dir(t.Path)
+		rel, err := filepath.Rel(l.Root, dir)
+		if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+			rel = ""
+		}
+		var parts []string
+		if rel != "" {
+			parts = strings.Split(rel, string(filepath.Separator))
+		}
+		artistDir, artistName := l.Root, filepath.Base(l.Root)
+		if len(parts) >= 1 {
+			artistName = parts[0]
+			artistDir = filepath.Join(l.Root, parts[0])
+		}
+		albumName := artistName
+		if len(parts) >= 2 {
+			albumName = strings.Join(parts[1:], "/")
+		}
+		ar, ok := artists[artistDir]
 		if !ok {
-			a = &Album{Name: t.Album, Artist: artistName, Year: t.Year, Dir: filepath.Dir(t.Path)}
-			albums[k] = a
-			ar, ok := artists[k.artist]
-			if !ok {
-				ar = &Artist{Name: artistName}
-				artists[k.artist] = ar
-			}
-			ar.Albums = append(ar.Albums, a)
+			ar = &Artist{Name: artistName, Dir: artistDir}
+			artists[artistDir] = ar
 		}
-		if a.Year == 0 {
-			a.Year = t.Year
+		al, ok := albums[dir]
+		if !ok {
+			al = &Album{Name: albumName, Artist: artistName, Dir: dir}
+			albums[dir] = al
+			ar.Albums = append(ar.Albums, al)
 		}
-		a.Tracks = append(a.Tracks, t)
+		if al.Year == 0 {
+			al.Year = t.Year
+		}
+		al.Tracks = append(al.Tracks, t)
 	}
 	l.Artists = l.Artists[:0]
 	for _, ar := range artists {
-		for _, a := range ar.Albums {
-			sort.SliceStable(a.Tracks, func(i, j int) bool {
-				x, y := a.Tracks[i], a.Tracks[j]
-				if x.DiscNo != y.DiscNo {
-					return x.DiscNo < y.DiscNo
-				}
-				if x.TrackNo != y.TrackNo {
-					return x.TrackNo < y.TrackNo
-				}
-				return x.Path < y.Path
+		for _, al := range ar.Albums {
+			sort.SliceStable(al.Tracks, func(i, j int) bool {
+				return naturalLess(filepath.Base(al.Tracks[i].Path), filepath.Base(al.Tracks[j].Path))
 			})
 		}
 		sort.SliceStable(ar.Albums, func(i, j int) bool {
-			x, y := ar.Albums[i], ar.Albums[j]
-			if x.Year != y.Year {
-				return x.Year < y.Year
-			}
-			return sortKey(x.Name) < sortKey(y.Name)
+			return naturalLess(ar.Albums[i].Name, ar.Albums[j].Name)
 		})
 		l.Artists = append(l.Artists, ar)
 	}
+	// folders in name order; files loose in the root come last
 	sort.SliceStable(l.Artists, func(i, j int) bool {
-		return sortKey(l.Artists[i].Name) < sortKey(l.Artists[j].Name)
+		x, y := l.Artists[i], l.Artists[j]
+		if (x.Dir == l.Root) != (y.Dir == l.Root) {
+			return y.Dir == l.Root
+		}
+		return naturalLess(x.Name, y.Name)
 	})
 }
 
@@ -284,13 +299,37 @@ func (l *Library) Albums() []*Album {
 	return out
 }
 
-// FindAlbum returns the album a track belongs to.
+// FindAlbum returns the album (folder) a track belongs to.
 func (l *Library) FindAlbum(t *Track) *Album {
+	dir := filepath.Dir(t.Path)
 	for _, ar := range l.Artists {
 		for _, a := range ar.Albums {
-			if norm(a.Name) == norm(t.Album) && norm(a.Artist) == norm(l.Aliases.Resolve(t.AlbumArtist)) {
+			if a.Dir == dir {
 				return a
 			}
+		}
+	}
+	return nil
+}
+
+// ArtistOf returns the artist (top-level folder) a track belongs to.
+func (l *Library) ArtistOf(t *Track) *Artist {
+	dir := filepath.Dir(t.Path)
+	for _, ar := range l.Artists {
+		for _, a := range ar.Albums {
+			if a.Dir == dir {
+				return ar
+			}
+		}
+	}
+	return nil
+}
+
+// FindArtist returns the artist with this name, or nil.
+func (l *Library) FindArtist(name string) *Artist {
+	for _, ar := range l.Artists {
+		if norm(ar.Name) == norm(name) {
+			return ar
 		}
 	}
 	return nil
@@ -303,12 +342,37 @@ func norm(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
 
-func sortKey(s string) string {
-	s = norm(s)
-	for _, pre := range []string{"the ", "a ", "an "} {
-		if strings.HasPrefix(s, pre) {
-			return s[len(pre):]
+// naturalLess orders names the way a file browser does: case-insensitive,
+// with runs of digits compared as numbers so "2" sorts before "10".
+func naturalLess(a, b string) bool {
+	a, b = strings.ToLower(a), strings.ToLower(b)
+	for a != "" && b != "" {
+		if isDigit(a[0]) && isDigit(b[0]) {
+			ai, bi := digitRun(a), digitRun(b)
+			na, nb := strings.TrimLeft(a[:ai], "0"), strings.TrimLeft(b[:bi], "0")
+			if len(na) != len(nb) {
+				return len(na) < len(nb)
+			}
+			if na != nb {
+				return na < nb
+			}
+			a, b = a[ai:], b[bi:]
+			continue
 		}
+		if a[0] != b[0] {
+			return a[0] < b[0]
+		}
+		a, b = a[1:], b[1:]
 	}
-	return s
+	return len(a) < len(b)
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+
+func digitRun(s string) int {
+	i := 0
+	for i < len(s) && isDigit(s[i]) {
+		i++
+	}
+	return i
 }

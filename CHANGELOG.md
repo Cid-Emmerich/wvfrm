@@ -16,6 +16,26 @@ go build -o wvfrm ./cmd/wvfrm
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-10
+
+### Changed
+- The library mirrors the music folder instead of grouping by tags: each
+  top-level folder is an artist, each folder inside it an album (nested
+  folders show as `Box Set/Disc 2`), and tracks are listed by file name in
+  name order. Files loose in the music folder appear last under the folder's
+  own name. Tags are still read for the now-playing details and search.
+- Shuffle by album now shuffles folders.
+- Sorting is plain name order; "The Beatles" sorts under T, as in Finder.
+
+### Removed
+- The artist merge tool (`M`), the `~/.config/wvfrm/aliases` file and tag
+  rewriting. Grouping follows folders now, so merging by tag had no effect.
+
+### Fixed
+- The UI tests wrote to the real `~/.config/wvfrm/wvfrmrc` when run with
+  `WVFRM_TEST_MUSIC`, replacing the music folder with a temporary path.
+  They now use a temporary config file.
+
 ## [1.1.1] - 2026-09-10
 
 ### Removed
@@ -69,7 +89,8 @@ First release.
 - Themes: twelve built in plus `match`, derived from the album art.
 - ctrl+k help overlay; settings saved on quit.
 
-[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.2
 [1.1.1]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.0.0

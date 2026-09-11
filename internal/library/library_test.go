@@ -28,7 +28,8 @@ func TestScanAndSearch(t *testing.T) {
 	for _, ar := range lib.Artists {
 		names[ar.Name] = true
 	}
-	for _, want := range []string{"Aurora Fields", "The Static Choir", "Unknown Artist"} {
+	// folders become artists; the file loose in the root sits under the root folder's name
+	for _, want := range []string{"Aurora Fields", "The Static Choir", filepath.Base(root)} {
 		if !names[want] {
 			t.Errorf("artist %q missing; have %v", want, names)
 		}
@@ -76,7 +77,7 @@ func TestScanAndSearch(t *testing.T) {
 	if len(lib2.Tracks) != len(lib.Tracks) {
 		t.Fatalf("cache reload mismatch %d vs %d", len(lib2.Tracks), len(lib.Tracks))
 	}
-	// album ordering by track number
+	// tracks listed in file-name order
 	al := lib.Best("night signals", KindAlbum).Album
 	for i := 1; i < len(al.Tracks); i++ {
 		if al.Tracks[i-1].TrackNo > al.Tracks[i].TrackNo {
@@ -86,4 +87,72 @@ func TestScanAndSearch(t *testing.T) {
 	if !lib.Best("second verse").Track.HasArt {
 		t.Error("embedded art flag not detected on mp3")
 	}
+}
+
+// TestFolderGrouping builds a library from paths alone and checks that the
+// tree mirrors the folders: nested folders, loose files and numeric order.
+func TestFolderGrouping(t *testing.T) {
+	root := filepath.Join("/music", "Music")
+	mk := func(rel string) *Track {
+		return &Track{Path: filepath.Join(root, filepath.FromSlash(rel)), Title: "tagged " + rel, AlbumArtist: "Tag Artist", Album: "Tag Album"}
+	}
+	lib := &Library{Root: root, Tracks: []*Track{
+		mk("The Beatles/Abbey Road/10 Something.mp3"),
+		mk("The Beatles/Abbey Road/2 Come Together.mp3"),
+		mk("The Beatles/Anthology/Disc 2/01 Real Love.mp3"),
+		mk("The Beatles/single.mp3"),
+		mk("Aurora Fields/Daybreak/01 Sunrise.wav"),
+		mk("loose.mp3"),
+	}}
+	lib.build()
+
+	names := []string{}
+	for _, ar := range lib.Artists {
+		names = append(names, ar.Name)
+	}
+	// plain name order, "The" included; loose files last under the root's name
+	if want := []string{"Aurora Fields", "The Beatles", "Music"}; !equal(names, want) {
+		t.Fatalf("artists = %v, want %v", names, want)
+	}
+	beatles := lib.FindArtist("The Beatles")
+	if beatles.Dir != filepath.Join(root, "The Beatles") {
+		t.Errorf("artist dir = %q", beatles.Dir)
+	}
+	albums := []string{}
+	for _, al := range beatles.Albums {
+		albums = append(albums, al.Name)
+	}
+	// nested folder shows its path; loose files in the artist folder use its name
+	if want := []string{"Abbey Road", "Anthology/Disc 2", "The Beatles"}; !equal(albums, want) {
+		t.Fatalf("albums = %v, want %v", albums, want)
+	}
+	// numeric order: 2 before 10
+	abbey := beatles.Albums[0]
+	if abbey.Tracks[0].FileName() != "2 Come Together" || abbey.Tracks[1].FileName() != "10 Something" {
+		t.Errorf("track order: %s, %s", abbey.Tracks[0].FileName(), abbey.Tracks[1].FileName())
+	}
+	// lookups go by folder, never by tag
+	single := lib.Tracks[3] // The Beatles/single.mp3
+	if lib.FindAlbum(single) == nil || lib.FindAlbum(single).Name != "The Beatles" || lib.ArtistOf(single) != beatles {
+		t.Error("FindAlbum/ArtistOf did not follow the folder")
+	}
+	loose := lib.Artists[2]
+	if loose.Dir != root || len(loose.Albums) != 1 || loose.Albums[0].Dir != root {
+		t.Errorf("loose group: %+v", loose)
+	}
+	if lib.Best("real love").Track == nil || lib.Best("anthology", KindAlbum) == nil {
+		t.Error("search on file and folder names failed")
+	}
+}
+
+func equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

@@ -14,31 +14,14 @@ import (
 
 var artistFileNames = []string{"artist", "photo", "band"}
 
-// ArtistDir returns the folder that holds an artist's albums when they all
-// live under one directory inside the music root ("~/Music/Artist"), or ""
-// when the artist's files are scattered (or sit directly in the root).
+// ArtistDir returns the artist's folder inside the music root, or "" for
+// the group of files that sit directly in the root (they have no folder of
+// their own) and for artists built without one.
 func ArtistDir(root string, ar *library.Artist) string {
-	dir := ""
-	for _, al := range ar.Albums {
-		parent := filepath.Dir(al.Dir)
-		if al.Dir == root || parent == root && len(ar.Albums) == 1 && filepath.Base(al.Dir) != "" && !strings.EqualFold(filepath.Base(al.Dir), ar.Name) {
-			// album folder straight under the root: only treat it as the
-			// artist folder when it is named after the artist
-			if !strings.EqualFold(filepath.Base(al.Dir), ar.Name) {
-				return ""
-			}
-			parent = al.Dir
-		}
-		if dir == "" {
-			dir = parent
-		} else if dir != parent {
-			return ""
-		}
-	}
-	if dir == root || dir == "" {
+	if ar.Dir == "" || ar.Dir == root {
 		return ""
 	}
-	return dir
+	return ar.Dir
 }
 
 // ArtistPhotoCache is where photos go when there is no artist folder.

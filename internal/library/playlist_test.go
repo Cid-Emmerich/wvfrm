@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestPlaylistsAliasesMerge(t *testing.T) {
+func TestPlaylists(t *testing.T) {
 	root := testRoot(t)
 	// work on a copy so the fixture is not modified
 	tmp := t.TempDir()
@@ -36,46 +36,6 @@ func TestPlaylistsAliasesMerge(t *testing.T) {
 	}
 	if lib.FindPlaylist("late") == nil {
 		t.Error("FindPlaylist failed")
-	}
-
-	// merge candidates: "Aurora Fields" vs a near-duplicate
-	from := lib.FindArtist("The Static Choir")
-	if from == nil {
-		t.Fatal("artist missing")
-	}
-	cands := lib.MergeCandidates(from)
-	if len(cands) != 2 { // the other two artists
-		t.Fatalf("candidates: %d", len(cands))
-	}
-	if artistKey("The Beatles") != artistKey("Beatles - Discography (1963-1970)") || artistKey("Beatles") != "beatles" {
-		t.Error("artistKey does not normalise")
-	}
-
-	// alias makes the library regroup without touching files
-	aliases := LoadAliases(filepath.Join(t.TempDir(), "aliases"))
-	if err := aliases.Add("The Static Choir", "Aurora Fields"); err != nil {
-		t.Fatal(err)
-	}
-	lib.SetAliases(aliases)
-	if lib.FindArtist("The Static Choir") != nil {
-		t.Error("alias not applied")
-	}
-	if ar := lib.FindArtist("Aurora Fields"); ar == nil || len(ar.Albums) != 3 {
-		t.Errorf("merged artist should have 3 albums: %+v", ar)
-	}
-	if lib.FindAlbum(lib.Best("static hymn").Track) == nil {
-		t.Error("FindAlbum through alias failed")
-	}
-	reloaded := LoadAliases(aliases.Path)
-	if reloaded.Resolve("the static choir") != "Aurora Fields" {
-		t.Error("alias file did not round-trip")
-	}
-
-	// in-memory rename
-	lib.SetAliases(nil)
-	changed := lib.Rename("Aurora Fields", "Aurora")
-	if len(changed) != 5 || lib.FindArtist("Aurora") == nil || lib.FindArtist("Aurora Fields") != nil {
-		t.Errorf("rename changed %d tracks", len(changed))
 	}
 }
 

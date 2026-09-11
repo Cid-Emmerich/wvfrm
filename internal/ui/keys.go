@@ -32,7 +32,7 @@ func (a *App) handleKey(e *tcell.EventKey) {
 		return
 	}
 
-	// A prompt (filter, playlist name, merge picker) takes all typing.
+	// A prompt (filter, playlist name) takes all typing.
 	if a.promptKey(e) {
 		return
 	}
@@ -282,8 +282,6 @@ func (a *App) libKey(r rune) {
 		a.lv.filter = ""
 		a.lv.setMode(a.lv.mode - 1)
 		a.showToast("library: "+modeNames[a.lv.mode]+" (b to switch)", false)
-	case 'M':
-		a.openMerge()
 	case 'P':
 		if n := a.lv.current(); n != nil {
 			what := "selection"

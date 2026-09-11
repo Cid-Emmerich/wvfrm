@@ -91,7 +91,6 @@ type App struct {
 	// library view
 	lv     libView
 	prompt prompt
-	pick   picker
 
 	// artist photos (library backdrop)
 	photos    map[string]*art.Art

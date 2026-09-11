@@ -55,8 +55,8 @@ func (r Result) Tracks() []*Track {
 	}
 }
 
-// Search scores artists, albums and tracks against a free-text query and
-// returns hits best first. kinds restricts the result types (nil = all).
+// Search scores artists and albums (folder names) and tracks (file names
+// and tag titles) against a free-text query and returns hits best first. kinds restricts the result types (nil = all).
 func (l *Library) Search(query string, kinds ...Kind) []Result {
 	q := norm(query)
 	if q == "" {
@@ -84,15 +84,18 @@ func (l *Library) Search(query string, kinds ...Kind) []Result {
 			}
 			if allow(KindTrack) {
 				for _, t := range a.Tracks {
-					s := score(q, t.Title)
+					s := score(q, t.FileName())
+					if s == 0 {
+						s = score(q, t.Title)
+					}
 					if s == 0 {
 						s = score(q, t.Artist+" "+t.Title)
 					}
 					if s == 0 {
-						s = score(q, ar.Name+" "+a.Name+" "+t.Title)
+						s = score(q, ar.Name+" "+a.Name+" "+t.FileName())
 					}
 					if s > 0 {
-						out = append(out, Result{Kind: KindTrack, Label: t.Title, Detail: t.Artist + " · " + a.Name, Score: s, Track: t})
+						out = append(out, Result{Kind: KindTrack, Label: t.FileName(), Detail: ar.Name + " · " + a.Name, Score: s, Track: t})
 					}
 				}
 			}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"math/rand"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -20,7 +21,7 @@ type ShuffleMode int
 const (
 	ShuffleOff    ShuffleMode = iota
 	ShuffleTracks             // every track in random order
-	ShuffleAlbums             // albums in random order, tracks in album order
+	ShuffleAlbums             // folders in random order, tracks in folder order
 )
 
 func (m ShuffleMode) String() string {
@@ -511,7 +512,7 @@ func (p *Player) rebuildOrder(keep int) {
 		var groups []*group
 		byKey := map[string]*group{}
 		for i, t := range p.queue {
-			k := t.AlbumArtist + "\x00" + t.Album
+			k := filepath.Dir(t.Path)
 			g, ok := byKey[k]
 			if !ok {
 				g = &group{key: k}
@@ -521,7 +522,7 @@ func (p *Player) rebuildOrder(keep int) {
 			g.idxs = append(g.idxs, i)
 		}
 		rand.Shuffle(len(groups), func(a, b int) { groups[a], groups[b] = groups[b], groups[a] })
-		keepKey := p.queue[keep].AlbumArtist + "\x00" + p.queue[keep].Album
+		keepKey := filepath.Dir(p.queue[keep].Path)
 		for i, g := range groups {
 			if g.key == keepKey {
 				groups[0], groups[i] = groups[i], groups[0]

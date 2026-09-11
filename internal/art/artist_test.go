@@ -21,24 +21,24 @@ func TestArtistPhotos(t *testing.T) {
 	cover, _ := os.ReadFile(filepath.Join(root, "Aurora Fields", "Night Signals", "cover.png"))
 	cache := filepath.Join(t.TempDir(), "cache")
 
-	aurora := &library.Artist{Name: "Aurora Fields", Albums: []*library.Album{
+	aurora := &library.Artist{Name: "Aurora Fields", Dir: filepath.Join(tmp, "Aurora Fields"), Albums: []*library.Album{
 		{Name: "Night Signals", Dir: filepath.Join(tmp, "Aurora Fields", "Night Signals")},
 		{Name: "Daybreak", Dir: filepath.Join(tmp, "Aurora Fields", "Daybreak")},
 	}}
 	if got := ArtistDir(tmp, aurora); got != filepath.Join(tmp, "Aurora Fields") {
 		t.Errorf("ArtistDir = %q", got)
 	}
-	// scattered artist: albums in different parents -> no folder
+	// an artist built without a folder (not from a scan) has none
 	scattered := &library.Artist{Name: "X", Albums: []*library.Album{
 		{Dir: filepath.Join(tmp, "Aurora Fields", "Daybreak")}, {Dir: filepath.Join(tmp, "The Static Choir", "Hum")},
 	}}
 	if ArtistDir(tmp, scattered) != "" {
-		t.Error("scattered artist should have no folder")
+		t.Error("artist without a folder should report none")
 	}
-	// album folder straight under the root, not named after the artist
-	loose := &library.Artist{Name: "Unknown Artist", Albums: []*library.Album{{Dir: tmp}}}
+	// files loose in the root are grouped under the root itself: no artist folder
+	loose := &library.Artist{Name: filepath.Base(tmp), Dir: tmp, Albums: []*library.Album{{Dir: tmp}}}
 	if ArtistDir(tmp, loose) != "" {
-		t.Error("root-level artist should have no folder")
+		t.Error("root-level group should have no folder")
 	}
 
 	if FindArtistPhoto(tmp, cache, aurora) != "" {

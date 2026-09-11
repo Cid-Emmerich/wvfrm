@@ -63,9 +63,13 @@ wvfrm looks for music in `~/Music`. Point it somewhere else with:
 wvfrm path ~/my/music/folder
 ```
 
-The folder is scanned once and cached, so later starts are instant. Files are
-grouped by the tags inside them (artist, album, track number). Untagged files
-fall back to the folder layout `Artist/Album/01 - Title.mp3`.
+The folder is scanned once and cached, so later starts are instant. The
+library mirrors your folders: each folder in the music directory is an
+artist, each folder inside it is an album, and the files are listed in name
+order, the way Finder shows them. Tags are still read for the now-playing
+details and for search, but they never move a file to a different place in
+the list. Files sitting loose in the music folder appear at the end, under the
+folder's own name.
 
 ## Playing music from the command line
 
@@ -83,8 +87,8 @@ wvfrm -t nord -v circle        # start with a theme and a visualizer
 wvfrm help
 ```
 
-Plain words search artists first, then albums, then tracks. Partial words work
-(`wvfrm rainb` finds *In Rainbows*).
+Plain words search artist folders first, then album folders, then tracks (by
+file name or tag title). Partial words work (`wvfrm rainb` finds *In Rainbows*).
 
 ## Inside the player
 
@@ -131,17 +135,6 @@ or album in the library saves that. Playlists are plain `.m3u8` files in a
 `Playlists` folder inside your music directory, so other players can read
 them. Browse them with `b` in the library, play one with `enter`, delete one
 with `delete`, or start one from the shell with `wvfrm playlist <name>`.
-
-### Fixing duplicate artists
-
-Tags are messy: "Beatles", "The Beatles" and "The Beatles - Discography" end up
-as three artists. Select one of them in the library and press `M`. wvfrm lists
-the other artists with the likely duplicates first; pick the name to keep and
-confirm. The change is recorded in `~/.config/wvfrm/aliases` (so the library
-regroups immediately and stays grouped after a rescan) and the artist and
-album-artist tags are rewritten in the files themselves: mp3 and flac
-natively, every other format through ffmpeg, so other players see the fix
-too. Files that cannot be written stay merged through the alias alone.
 
 ### Album art
 
@@ -212,8 +205,8 @@ terminal's own colours.
 
 ### Shuffle, repeat and crossfade
 
-* Shuffle **tracks** mixes everything; shuffle **albums** plays whole albums in
-  random order with their tracks in the right sequence.
+* Shuffle **tracks** mixes everything; shuffle **albums** plays whole folders in
+  random order with their tracks in file order.
 * Repeat **all** loops the queue, repeat **one** loops the current song.
 * Crossfade (`f`) mixes the end of one song into the start of the next. The
   length is adjustable from half a second to twenty seconds with `{` and `}`.
@@ -224,7 +217,6 @@ terminal's own colours.
 | path | purpose |
 | --- | --- |
 | `~/.config/wvfrm/wvfrmrc` | settings, plain `key = value` lines |
-| `~/.config/wvfrm/aliases` | artist merges made with `M` |
 | `<music>/Playlists/*.m3u8` | saved playlists |
 | `~/.cache/wvfrm/library.json` | scanned library cache (safe to delete) |
 | `~/.cache/wvfrm/lyrics/` | whisper transcriptions (safe to delete) |
@@ -245,8 +237,7 @@ WVFRM_TEST_MUSIC=/tmp/wvfrm-test-music go test ./...   # full engine and UI test
 
 The full tests use a small generated folder of tagged audio files; they cover
 decoding of every format, crossfading, queue logic, shuffle modes, cover
-extraction and embedding, tag rewriting, playlists, the artist merge tool,
-every visualizer, and a scripted walkthrough of every screen on a simulated
+extraction and embedding, playlists, every visualizer, and a scripted walkthrough of every screen on a simulated
 terminal. Set `WVFRM_TEST_WHISPER_MODEL` to a ggml model file to run the
 whisper transcription test as well.
 
@@ -258,11 +249,10 @@ Xcode command line tools are needed to build (`xcode-select --install`).
 ```
 cmd/wvfrm          command line entry point
 internal/config    settings file and paths
-internal/library   scanning, tags, cache, search
+internal/library   folder tree, tags, cache, search
 internal/audio     decoding, mixing, crossfade, queue, shuffle/repeat
 internal/dsp       FFT and spectrum analysis
 internal/art       cover and artist photo loading, online search, embedding, rendering, palette
-internal/tags      writing artist tags back into files
 internal/lyrics    .lrc parsing and whisper.cpp transcription
 internal/mediakeys macOS media keys and Now Playing (cgo), no-ops elsewhere
 internal/theme     colour themes and match-art theme

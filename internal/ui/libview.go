@@ -154,7 +154,7 @@ func (v *libView) current() *node {
 }
 
 // currentArtist returns the artist the cursor row belongs to (used for the
-// artist photo backdrop and the merge tool).
+// artist photo backdrop).
 func (v *libView) currentArtist() *library.Artist {
 	n := v.current()
 	if n == nil {
@@ -163,17 +163,13 @@ func (v *libView) currentArtist() *library.Artist {
 	if n.artist != nil {
 		return n.artist
 	}
-	var name string
 	switch {
 	case n.album != nil:
-		name = n.album.Artist
+		return v.lib.FindArtist(n.album.Artist)
 	case n.track != nil:
-		name = v.lib.Aliases.Resolve(n.track.AlbumArtist)
+		return v.lib.ArtistOf(n.track)
 	}
-	if name == "" {
-		return nil
-	}
-	return v.lib.FindArtist(name)
+	return nil
 }
 
 func (v *libView) move(d int) {

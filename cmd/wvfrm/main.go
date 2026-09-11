@@ -28,7 +28,7 @@ import (
 	"github.com/Cid-Emmerich/wvfrm/internal/vis"
 )
 
-const version = "1.1.1"
+const version = "1.1.2"
 
 // The macOS media-key bridge needs the process's main thread to run the
 // system event loop, so the main goroutine is pinned to it and the player
@@ -333,9 +333,6 @@ func loadLibrary(cfg config.Config, verbose bool) *library.Library {
 	lib, err := library.Load(cfg.MusicDir, cfg.CachePath, progress)
 	if err != nil {
 		fail("scan: %v", err)
-	}
-	if al := library.LoadAliases(cfg.AliasPath); al.Len() > 0 {
-		lib.SetAliases(al)
 	}
 	return lib
 }
