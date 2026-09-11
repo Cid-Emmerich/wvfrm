@@ -17,8 +17,8 @@ album, crossfading between songs, and a single help screen on **ctrl+k**.
   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀      Signal Lost
   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀      Aurora Fields
   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀      Night Signals (2021)
-  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀      track 1 · 3:52 · queue 1/9
+  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀            ▂▂    ▅▅
+  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀      ██ ▄▄ ██ ▆▆ ██ ▃▃ ▁▁
  1:12 ━━━━━━━━━━━━━━━━━━━━╸──────────────────────────────────────────── 3:52
  ▶ playing · shuffle off · repeat all · fade 4.0s · vol 80%   theme match · art blocks
 ```
@@ -158,8 +158,8 @@ saves it as `artist.jpg` in the artist's folder. In the library, `d` works on
 whatever is selected. If the photo is wrong, press `d` again: the next match
 is fetched instead, cycling through everything the sources have. You can
 also drop your own `artist.jpg` (or `.png`) into the folder and wvfrm uses
-that. Album-art mode also shows a small live spectrum under the track
-details.
+that. Album-art mode shows a live spectrum beside the art, under the
+title, artist and album.
 
 ### Lyrics
 

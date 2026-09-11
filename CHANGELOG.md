@@ -16,6 +16,15 @@ go build -o wvfrm ./cmd/wvfrm
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-09-10
+
+### Changed
+- Album-art view is closer to kew: the track-number, duration, genre,
+  queue-position and art-source lines are gone, leaving title, artist and
+  album with the spectrum filling the rest of the space beside the art.
+- The spectrum's bars are two cells wide with a one-cell gap and spread
+  across the full width, so they follow the window as it is resized.
+
 ## [1.1.3] - 2026-09-10
 
 ### Changed
@@ -101,7 +110,8 @@ First release.
 - Themes: twelve built in plus `match`, derived from the album art.
 - ctrl+k help overlay; settings saved on quit.
 
-[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.4
 [1.1.3]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.3
 [1.1.2]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.2
 [1.1.1]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.1

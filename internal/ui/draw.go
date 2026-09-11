@@ -281,7 +281,8 @@ func (a *App) drawArtLayout(w, top, mh int, st audio.Status) {
 		a.puts(ax+(aw-len(hint))/2, ay+ah/2, hint, a.st(a.th.Muted), aw)
 	}
 
-	// Track info to the right of the art.
+	// Title, artist and album to the right of the art, kew style; the rest
+	// of the space is the spectrum.
 	ix := ax + aw + 4
 	iw := w - ix - 2
 	if iw < 10 {
@@ -294,14 +295,6 @@ func (a *App) drawArtLayout(w, top, mh int, st audio.Status) {
 		{t.Title, a.st(a.th.Accent).Bold(true)},
 		{t.Artist, a.st(a.th.Text)},
 		{albumLine(t), a.st(a.th.Muted)},
-		{"", tcell.StyleDefault},
-		{trackLine(t, st), a.st(a.th.Muted)},
-	}
-	if a.artNote != "" {
-		lines = append(lines, struct {
-			s     string
-			style tcell.Style
-		}{"art: " + a.artNote, a.st(a.th.Muted)})
 	}
 	if a.artMode == "ascii" && a.curArt != nil {
 		lines = append(lines, struct {
@@ -309,8 +302,8 @@ func (a *App) drawArtLayout(w, top, mh int, st audio.Status) {
 			style tcell.Style
 		}{"ascii charset: " + a.charset + " (c to change)", a.st(a.th.Muted)})
 	}
-	// Small spectrum under the details, kew style.
-	eqH := min(5, mh-len(lines)-2)
+	// Spectrum under the details: as tall as the art, as wide as the space.
+	eqH := min(mh-len(lines)-2, max(ah, 5))
 	if eqH < 2 || st.Track == nil {
 		eqH = 0
 	}
@@ -322,7 +315,7 @@ func (a *App) drawArtLayout(w, top, mh int, st audio.Status) {
 		a.puts(ix, iy+i, fit(l.s, iw), l.style, iw)
 	}
 	if eqH > 0 {
-		ew := min(iw, 48)
+		ew := iw
 		if a.miniCanvas == nil || a.miniCanvas.W != ew || a.miniCanvas.H != eqH {
 			a.miniCanvas = vis.NewCanvas(ew, eqH)
 		}
@@ -339,23 +332,6 @@ func albumLine(t *library.Track) string {
 		s += fmt.Sprintf(" (%d)", t.Year)
 	}
 	return s
-}
-
-func trackLine(t *library.Track, st audio.Status) string {
-	parts := []string{}
-	if t.TrackNo > 0 {
-		parts = append(parts, fmt.Sprintf("track %d", t.TrackNo))
-	}
-	if st.Duration > 0 {
-		parts = append(parts, fmtTime(st.Duration))
-	}
-	if t.Genre != "" {
-		parts = append(parts, t.Genre)
-	}
-	if st.QueueLen > 0 {
-		parts = append(parts, fmt.Sprintf("queue %d/%d", st.QueuePos+1, st.QueueLen))
-	}
-	return strings.Join(parts, " · ")
 }
 
 func (a *App) drawBox(x, y, w, h int, col art.RGB) {

@@ -283,14 +283,16 @@ func colorAt(f *Frame, v, u float64) art.RGB {
 	return Gradient(f.Opts.Gradient, v, u, f.Time, f.Theme)
 }
 
-// Mini is the small spectrum shown under the track details in album-art
-// mode: one-cell bars with a one-cell gap, theme gradient, no peaks. It is
-// not part of the Registry.
+// Mini is the spectrum shown beside the album art: two-cell bars with a
+// one-cell gap across the whole width, theme gradient, no peaks. It is not
+// part of the Registry.
 type Mini struct{ b bands }
+
+const miniBarW, miniGap = 2, 1
 
 // Draw fills the canvas with bars growing from its bottom row.
 func (m *Mini) Draw(c *Canvas, f *Frame) {
-	n := (c.W + 1) / 2
+	n := (c.W + miniGap) / (miniBarW + miniGap)
 	if n < 1 || c.H < 1 {
 		return
 	}
@@ -298,6 +300,9 @@ func (m *Mini) Draw(c *Canvas, f *Frame) {
 	for i := 0; i < n; i++ {
 		u := float64(i) / float64(max(n-1, 1))
 		h := vals[i] * float64(c.H)
-		drawColumn(c, i*2, c.H-1, -1, h, c.H, u, f)
+		x0 := i * (miniBarW + miniGap)
+		for x := x0; x < x0+miniBarW && x < c.W; x++ {
+			drawColumn(c, x, c.H-1, -1, h, c.H, u, f)
+		}
 	}
 }
