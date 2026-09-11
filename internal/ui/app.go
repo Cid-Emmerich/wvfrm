@@ -92,12 +92,18 @@ type App struct {
 	lv     libView
 	prompt prompt
 
-	// artist photos (library backdrop)
+	// artist photos (library panel)
 	photos    map[string]*art.Art
 	photoBusy map[string]bool
-	backdrop  struct {
+	photoNext map[string]int // next online candidate to try when d is pressed again
+	panel     struct {
 		key   string
-		cells [][]art.RGB
+		cells [][]art.Cell
+	}
+	photoWant  photoWant // where the panel wants the Kitty image this frame
+	photoKitty struct {
+		drawn bool
+		key   string
 	}
 	miniVis    vis.Mini
 	miniCanvas *vis.Canvas
@@ -308,6 +314,11 @@ func (a *App) handle(ev tcell.Event) {
 			} else {
 				a.onPhotoResult(d)
 			}
+		case photoAdvance:
+			if a.photoNext == nil {
+				a.photoNext = map[string]int{}
+			}
+			a.photoNext[d.name] = d.next
 		case lyricsResult:
 			a.onLyricsResult(d)
 		case lyricsStatus:
@@ -449,5 +460,9 @@ func (a *App) kittyClear() {
 	if a.kittyDrawn {
 		os.Stdout.WriteString(art.KittyDelete(a.kittyID))
 		a.kittyDrawn = false
+	}
+	if a.photoKitty.drawn {
+		os.Stdout.WriteString(art.KittyDelete(a.kittyID + 1))
+		a.photoKitty.drawn = false
 	}
 }

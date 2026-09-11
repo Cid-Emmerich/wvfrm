@@ -7,7 +7,6 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	"math"
 	"os"
 	"strings"
 
@@ -207,34 +206,3 @@ func Luminance(c RGB) float64 {
 
 // ToColor converts to the standard library colour type.
 func (c RGB) ToColor() color.RGBA { return color.RGBA{c.R, c.G, c.B, 255} }
-
-// Backdrop samples the image to one colour per cell so it can sit behind
-// text: the picture is scaled to cover the whole w x h cell area (cells are
-// about twice as tall as wide), cropped in the middle, and dimmed to `dim`
-// (0 = black, 1 = untouched).
-func Backdrop(img image.Image, w, h int, dim float64) [][]RGB {
-	if w <= 0 || h <= 0 || img == nil {
-		return nil
-	}
-	b := img.Bounds()
-	iw, ih := float64(b.Dx()), float64(b.Dy())
-	// target in "pixel" units: each cell is 1 wide, 2 tall
-	tw, th := float64(w), float64(h*2)
-	s := math.Max(tw/iw, th/ih)
-	sw, sh := max(1, int(iw*s+0.5)), max(1, int(ih*s+0.5))
-	scaled := scale(img, sw, sh)
-	ox, oy := (sw-w)/2, (sh-h*2)/2
-	out := make([][]RGB, h)
-	for y := 0; y < h; y++ {
-		out[y] = make([]RGB, w)
-		for x := 0; x < w; x++ {
-			c1 := rgbAt(scaled, ox+x, oy+y*2)
-			c2 := rgbAt(scaled, ox+x, oy+y*2+1)
-			r := float64(int(c1.R)+int(c2.R)) / 2 * dim
-			g := float64(int(c1.G)+int(c2.G)) / 2 * dim
-			bl := float64(int(c1.B)+int(c2.B)) / 2 * dim
-			out[y][x] = RGB{uint8(r), uint8(g), uint8(bl)}
-		}
-	}
-	return out
-}

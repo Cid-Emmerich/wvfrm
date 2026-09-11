@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image"
 	"path/filepath"
 
 	"github.com/gdamore/tcell/v2"
@@ -49,7 +50,7 @@ func (a *App) onPhotoResult(r photoResult) {
 	}
 	a.photos[r.name] = r.art
 	delete(a.photoBusy, r.name)
-	a.backdrop.key = ""
+	a.panel.key = ""
 }
 
 // forgetPhoto drops a cached photo so it is re-read from disk.
@@ -57,32 +58,40 @@ func (a *App) forgetPhoto(name string) {
 	if a.photos != nil {
 		delete(a.photos, name)
 	}
-	a.backdrop.key = ""
+	a.panel.key = ""
 }
 
-// libraryBackdrop returns the dimmed photo of the artist under the cursor,
-// sampled to the list area, or nil.
-func (a *App) libraryBackdrop(w, rows int) [][]art.RGB {
-	ar := a.lv.currentArtist()
-	p := a.artistPhoto(ar)
-	if p == nil {
-		return nil
+// photoWant records where the library panel wants the Kitty image this
+// frame; drawPhotoKitty paints or removes it after the screen is shown.
+type photoWant struct {
+	key        string
+	img        image.Image
+	x, y       int
+	cols, rows int
+}
+
+// photoAdvance is posted after an online photo was fetched so the next
+// press of d tries the following candidate.
+type photoAdvance struct {
+	name string
+	next int
+}
+
+// photoPanelCells renders the photo for the library panel in the same style
+// as the album art (blocks or ascii), cached per size.
+func (a *App) photoPanelCells(p *art.Art, pw, ph int) [][]art.Cell {
+	key := fmt.Sprintf("%s|%s|%d|%d|%p", a.artMode, a.charset, pw, ph, p)
+	if a.panel.key == key {
+		return a.panel.cells
 	}
-	key := fmt.Sprintf("%s|%d|%d|%p", ar.Name, w, rows, p)
-	if a.backdrop.key != key {
-		a.backdrop.key = key
-		a.backdrop.cells = art.Backdrop(p.Image, w, rows, 0.28)
-		// fade the left side further so the text stays easy to read
-		for y := range a.backdrop.cells {
-			for x := range a.backdrop.cells[y] {
-				u := float64(x) / float64(max(w-1, 1))
-				f := 0.45 + 0.55*u
-				c := &a.backdrop.cells[y][x]
-				c.R, c.G, c.B = uint8(float64(c.R)*f), uint8(float64(c.G)*f), uint8(float64(c.B)*f)
-			}
-		}
+	var cells [][]art.Cell
+	if a.artMode == "ascii" {
+		cells = art.ASCII(p.Image, pw, ph, a.charset, a.th.Name != "mono")
+	} else {
+		cells = art.Blocks(p.Image, pw, ph)
 	}
-	return a.backdrop.cells
+	a.panel.key, a.panel.cells = key, cells
+	return cells
 }
 
 // findArtOnline searches the web for the cover of the album and the photo
@@ -150,6 +159,11 @@ func (a *App) findArtOnline() {
 	}
 	a.showToast("searching for artwork: "+what+"…", false)
 	root, cache, cachePath := a.cfg.MusicDir, filepath.Dir(a.cfg.CachePath), a.cfg.CachePath
+	// an artist who already has a photo gets the next candidate instead
+	next := 0
+	if artist != nil && a.photos[artist.Name] != nil {
+		next = a.photoNext[artist.Name]
+	}
 	go func() {
 		var notes []string
 		errs := 0
@@ -173,20 +187,30 @@ func (a *App) findArtOnline() {
 			}
 		}
 		if artist != nil {
-			data, src, err := art.FindArtistOnline(artist.Name)
-			switch {
-			case err != nil:
+			cands, err := art.ArtistPhotoCandidates(artist.Name)
+			if err != nil {
 				notes = append(notes, "no photo of "+artist.Name)
 				errs++
-			default:
-				if _, err := art.Decode(data); err != nil {
-					notes = append(notes, "photo not readable")
+			} else {
+				idx := next % len(cands)
+				c := cands[idx]
+				a.scr.PostEvent(tcell.NewEventInterrupt(photoAdvance{name: artist.Name, next: idx + 1}))
+				data, err := art.FetchPhoto(c)
+				if err == nil {
+					_, err = art.Decode(data)
+				}
+				if err != nil {
+					notes = append(notes, "photo from "+c.Source+" not usable")
 					errs++
 				} else if p, err := art.SaveArtistPhoto(root, cache, artist, data); err != nil {
 					notes = append(notes, "could not save photo: "+err.Error())
 					errs++
 				} else {
-					notes = append(notes, "photo from "+src+" saved to "+filepath.Base(filepath.Dir(p))+"/"+filepath.Base(p))
+					n := fmt.Sprintf("photo %d/%d from %s saved to %s/%s", idx+1, len(cands), c.Source, filepath.Base(filepath.Dir(p)), filepath.Base(p))
+					if len(cands) > 1 {
+						n += " · d again for the next"
+					}
+					notes = append(notes, n)
 					a.scr.PostEvent(tcell.NewEventInterrupt(photoResult{name: artist.Name, reload: true}))
 				}
 			}

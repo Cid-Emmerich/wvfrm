@@ -63,17 +63,23 @@ func TestArtistPhotos(t *testing.T) {
 	if FindArtistPhoto(tmp, cache, scattered) != p {
 		t.Error("cached photo not found")
 	}
+}
 
-	// backdrop: right size, dimmed
-	cells := Backdrop(a.Image, 40, 10, 0.3)
-	if len(cells) != 10 || len(cells[0]) != 40 {
-		t.Fatalf("backdrop size %dx%d", len(cells[0]), len(cells))
+func TestCleanArtistName(t *testing.T) {
+	cases := map[string]string{
+		"The Beatles - Discography": "The Beatles",
+		"Radiohead (1993-2016)":     "Radiohead",
+		"Aurora Fields [FLAC]":      "Aurora Fields",
+		"Nirvana Discography":       "Nirvana",
+		"  Boards of Canada  ":      "Boards of Canada",
+		"Sunn O)))":                 "Sunn O)))",
 	}
-	for _, row := range cells {
-		for _, c := range row {
-			if c.R > 80 || c.G > 80 || c.B > 80 {
-				t.Fatalf("backdrop not dimmed: %+v", c)
-			}
+	for in, want := range cases {
+		if got := cleanArtistName(in); got != want {
+			t.Errorf("cleanArtistName(%q) = %q, want %q", in, got, want)
 		}
+	}
+	if !sameArtist("The Beatles", "beatles") || sameArtist("Aurora", "Aurora Fields") {
+		t.Error("sameArtist comparison wrong")
 	}
 }

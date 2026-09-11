@@ -126,7 +126,8 @@ the whole library as you type. `o` jumps to the song that is playing.
 
 `b` switches what the library lists: **artists** (the default tree), **albums**
 (every album in one flat list) or **playlists**. When an artist has a photo it
-shows dimmed behind the list as you move over their music.
+appears in a panel beside the list as you move over their music, drawn in the
+same style as the album art (`A`: blocks, ascii or pixel-perfect kitty).
 
 ### Playlists
 
@@ -152,10 +153,13 @@ and the Cover Art Archive for the current album. The picture is saved as
 `cover.jpg` in the album folder and embedded into every mp3 and flac in it.
 
 The same key also looks for a photo of the artist (Deezer, then the image
-MusicBrainz links on Wikimedia Commons) and saves it as `artist.jpg` in the
-artist's folder, or under `~/.cache/wvfrm/artists` when their albums are not
-kept together. In the library, `d` works on whatever is selected. Album-art
-mode also shows a small live spectrum under the track details.
+MusicBrainz links on Wikimedia Commons; only exact name matches count) and
+saves it as `artist.jpg` in the artist's folder. In the library, `d` works on
+whatever is selected. If the photo is wrong, press `d` again: the next match
+is fetched instead, cycling through everything the sources have. You can
+also drop your own `artist.jpg` (or `.png`) into the folder and wvfrm uses
+that. Album-art mode also shows a small live spectrum under the track
+details.
 
 ### Lyrics
 

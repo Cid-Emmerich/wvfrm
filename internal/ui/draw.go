@@ -62,6 +62,7 @@ func (a *App) fillRow(y, x0, x1 int, style tcell.Style) {
 // draw renders the whole screen.
 func (a *App) draw() {
 	a.scr.Clear()
+	a.photoWant = photoWant{}
 	w, h := a.scr.Size()
 	if w < 20 || h < 6 {
 		a.puts(0, 0, "window too small", a.st(a.th.Warn), w)
@@ -83,6 +84,7 @@ func (a *App) draw() {
 	}
 	a.scr.Show()
 	a.drawKitty(w, h)
+	a.drawPhotoKitty()
 }
 
 var tabNames = []string{"Now Playing", "Library", "Queue"}
@@ -526,7 +528,18 @@ func (a *App) drawLibrary(w, h int) {
 		v.scroll = 0
 	}
 	cur := a.pl.Current()
-	defer a.applyBackdrop(w, 1, rows, 1+v.cursor-v.scroll)
+	// artist photo panel on the right: needs a photo and room for it
+	lw := w
+	var photo *art.Art
+	var px, py, pw, ph int
+	if p := a.artistPhoto(a.lv.currentArtist()); p != nil && w >= 60 && rows >= 4 {
+		panelW := min(max(w/3, 20), 44)
+		lw = w - panelW - 1
+		pw, ph = art.Fit(p.Image, panelW-2, rows-1)
+		px = lw + 1 + (panelW-pw)/2
+		py = 1 + (rows-ph)/2
+		photo = p
+	}
 	for i := 0; i < rows; i++ {
 		idx := v.scroll + i
 		if idx >= len(v.nodes) {
@@ -540,7 +553,7 @@ func (a *App) drawLibrary(w, h int) {
 			bg := tc(a.th.Select)
 			base = base.Background(bg)
 			muted = muted.Background(bg)
-			a.fillRow(y, 0, w, base)
+			a.fillRow(y, 0, lw, base)
 		}
 		x := 1 + n.depth*2
 		var label, extra string
@@ -607,15 +620,39 @@ func (a *App) drawLibrary(w, h int) {
 				}
 			}
 		}
-		avail := w - x - 1
+		avail := lw - x - 1
 		if extra != "" {
-			ex := w - len([]rune(extra)) - 1
+			ex := lw - len([]rune(extra)) - 1
 			if ex > x+10 {
-				a.puts(ex, y, extra, muted, w)
+				a.puts(ex, y, extra, muted, lw)
 				avail = ex - x - 1
 			}
 		}
 		a.puts(x, y, fit(label, avail), labelStyle, avail)
+	}
+	if photo != nil {
+		sep := a.st(a.th.Muted)
+		for y := 1; y <= rows; y++ {
+			a.puts(lw, y, "│", sep, 1)
+		}
+		if a.artMode == "kitty" {
+			// region stays blank; the image is painted after Show()
+			a.photoWant = photoWant{key: fmt.Sprintf("%p|%d|%d|%d|%d", photo, px, py, pw, ph), img: photo.Image, x: px, y: py, cols: pw, rows: ph}
+		} else {
+			for y, row := range a.photoPanelCells(photo, pw, ph) {
+				for x, c := range row {
+					fg := c.Fg
+					if fg == (art.RGB{}) && !c.HasBg {
+						fg = a.th.Text
+					}
+					style := tcell.StyleDefault.Foreground(tc(fg))
+					if c.HasBg {
+						style = style.Background(tc(c.Bg))
+					}
+					a.scr.SetContent(px+x, py+y, c.Ch, nil, style)
+				}
+			}
+		}
 	}
 	if len(v.nodes) == 0 {
 		msg := "no matches"
@@ -641,28 +678,6 @@ func (a *App) drawLibrary(w, h int) {
 	}
 	x := 1 + a.puts(1, h-2, "["+modeNames[v.mode]+"] ", a.st(a.th.Accent), w-2)
 	a.puts(x, h-2, fit(status, w-x-1), a.st(a.th.Muted), w-x-1)
-}
-
-// applyBackdrop paints the artist photo behind rows y0..y0+rows of the
-// library, keeping whatever text is already there. The cursor row keeps
-// its own highlight.
-func (a *App) applyBackdrop(w, y0, rows, skipRow int) {
-	cells := a.libraryBackdrop(w, rows)
-	if cells == nil {
-		return
-	}
-	for y := 0; y < rows && y < len(cells); y++ {
-		if y0+y == skipRow {
-			continue
-		}
-		for x := 0; x < w && x < len(cells[y]); x++ {
-			ch, comb, style, _ := a.scr.GetContent(x, y0+y)
-			if ch == 0 {
-				ch = ' '
-			}
-			a.scr.SetContent(x, y0+y, ch, comb, style.Background(tc(cells[y][x])))
-		}
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -828,4 +843,27 @@ func (a *App) drawKitty(w, h int) {
 	// save cursor, move, paint, restore
 	os.Stdout.WriteString(fmt.Sprintf("\x1b7\x1b[%d;%dH%s\x1b8", ay+1, ax+1, seq))
 	a.kittyDrawn = true
+}
+
+// drawPhotoKitty keeps the Kitty image of the artist photo in step with the
+// library panel: painted when the panel wants it, deleted when it moves,
+// changes or goes away.
+func (a *App) drawPhotoKitty() {
+	want := a.photoWant
+	if a.view != ViewLibrary || a.help || a.artMode != "kitty" {
+		want.key = ""
+	}
+	if a.photoKitty.drawn && a.photoKitty.key != want.key {
+		os.Stdout.WriteString(art.KittyDelete(a.kittyID + 1))
+		a.photoKitty.drawn = false
+	}
+	if want.key == "" || a.photoKitty.drawn {
+		return
+	}
+	seq := art.KittyImage(want.img, want.cols, want.rows, a.kittyID+1)
+	if seq == "" {
+		return
+	}
+	os.Stdout.WriteString(fmt.Sprintf("\x1b7\x1b[%d;%dH%s\x1b8", want.y+1, want.x+1, seq))
+	a.photoKitty.drawn, a.photoKitty.key = true, want.key
 }

@@ -129,9 +129,10 @@ func copyTree(t *testing.T, src, dst string) {
 	}
 }
 
-// TestArtistBackdrop puts a photo in the artist folder and checks the
-// library rows are painted with it behind the text.
-func TestArtistBackdrop(t *testing.T) {
+// TestArtistPanel puts a photo in the artist folder and checks it is drawn
+// as a half-block panel beside the list, and that the panel goes away for
+// an artist without a photo.
+func TestArtistPanel(t *testing.T) {
 	root := os.Getenv("WVFRM_TEST_MUSIC")
 	if root == "" {
 		t.Skip("set WVFRM_TEST_MUSIC")
@@ -163,21 +164,27 @@ func TestArtistBackdrop(t *testing.T) {
 	if a.photos["Aurora Fields"] == nil {
 		t.Fatal("artist photo never loaded")
 	}
-	a.draw()
-	cells, w, _ := scr.GetContents()
-	painted := 0
-	for y := 1; y < 4; y++ {
-		for x := 0; x < w; x++ {
-			_, bg, _ := cells[y*w+x].Style.Decompose()
-			if bg != tcell.ColorDefault {
-				painted++
+	// the panel takes the right third: count half-block cells there
+	blocks := func() int {
+		cells, w, _ := scr.GetContents()
+		n := 0
+		for y := 1; y < 17; y++ {
+			for x := w - 26; x < w; x++ {
+				if c := cells[y*w+x]; len(c.Runes) > 0 && c.Runes[0] == '▀' {
+					n++
+				}
 			}
 		}
+		return n
 	}
-	if painted < w { // at least the two non-cursor rows should carry colour
-		t.Errorf("backdrop painted %d cells only", painted)
+	a.draw()
+	if n := blocks(); n < 40 {
+		t.Errorf("panel drew only %d half-block cells\n%s", n, screenText(scr))
 	}
-	// moving to an artist without a photo clears it
+	if txt := screenText(scr); !strings.Contains(txt, "Aurora Fields") || !strings.Contains(txt, "│") {
+		t.Errorf("list or separator missing\n%s", txt)
+	}
+	// moving to an artist without a photo removes the panel
 	a.lv.cursor = 1
 	a.draw()
 	for i := 0; i < 100; i++ {
@@ -189,10 +196,8 @@ func TestArtistBackdrop(t *testing.T) {
 		}
 	}
 	a.draw()
-	cells, w, _ = scr.GetContents()
-	_, bg, _ := cells[3*w+5].Style.Decompose()
-	if bg != tcell.ColorDefault {
-		t.Error("backdrop should be gone for an artist without a photo")
+	if n := blocks(); n != 0 {
+		t.Errorf("panel should be gone for an artist without a photo, found %d cells", n)
 	}
 }
 

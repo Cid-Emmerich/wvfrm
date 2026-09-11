@@ -16,6 +16,18 @@ go build -o wvfrm ./cmd/wvfrm
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-09-10
+
+### Changed
+- Artist photos moved out from behind the library list into a panel beside
+  it, drawn like the album art: half-block colour, ascii, or the Kitty
+  graphics protocol for a pixel-perfect picture. Full colour, no crop, no
+  dimming; the list keeps its full width when there is no photo.
+- The online photo search only accepts exact name matches on every source
+  and ignores folder-name decorations such as " - Discography" or "(1998)".
+- Pressing `d` on an artist who already has a photo fetches the next
+  candidate, so a wrong picture can be swapped without leaving the player.
+
 ## [1.1.2] - 2026-09-10
 
 ### Changed
@@ -89,7 +101,8 @@ First release.
 - Themes: twelve built in plus `match`, derived from the album art.
 - ctrl+k help overlay; settings saved on quit.
 
-[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.3
 [1.1.2]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.2
 [1.1.1]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.0

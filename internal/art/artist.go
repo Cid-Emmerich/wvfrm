@@ -135,28 +135,96 @@ func extFor(data []byte) string {
 	return ".jpg"
 }
 
-// FindArtistOnline looks up a photo of the artist: Deezer first (fast, no
-// key), then MusicBrainz's link to a Wikimedia Commons image.
-func FindArtistOnline(name string) ([]byte, string, error) {
-	var errs []string
-	if data, src, err := findDeezerArtist(name); err == nil {
-		return data, src, nil
-	} else {
-		errs = append(errs, "deezer: "+err.Error())
-	}
-	if data, src, err := findCommonsArtist(name); err == nil {
-		return data, src, nil
-	} else {
-		errs = append(errs, "musicbrainz: "+err.Error())
-	}
-	return nil, "", errors.New(strings.Join(errs, "; "))
+// PhotoCandidate is one online picture that may show the artist.
+type PhotoCandidate struct {
+	URL    string
+	Source string
 }
 
-func findDeezerArtist(name string) ([]byte, string, error) {
-	q := url.Values{"q": {name}, "limit": {"5"}}
-	body, err := get("https://api.deezer.com/search/artist?" + q.Encode())
+// cleanArtistName strips the decorations folder names tend to carry
+// ("Artist - Discography", "Artist (1998-2004)", "Artist [FLAC]") so the
+// online search sees the name alone.
+func cleanArtistName(name string) string {
+	s := strings.TrimSpace(name)
+	for _, sep := range []string{" - ", " – ", " — ", " (", " [", " {"} {
+		if i := strings.Index(s, sep); i > 0 {
+			s = s[:i]
+		}
+	}
+	for _, suffix := range []string{"discography", "collection", "anthology"} {
+		if strings.HasSuffix(strings.ToLower(s), " "+suffix) {
+			s = s[:len(s)-len(suffix)]
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
+// sameArtist compares names loosely on punctuation and case, strictly on
+// the words: a photo of the wrong "Aurora" is worse than none.
+func sameArtist(a, b string) bool {
+	return strings.TrimPrefix(simplify(a), "the ") == strings.TrimPrefix(simplify(b), "the ")
+}
+
+// ArtistPhotoCandidates lists pictures whose artist name matches exactly:
+// Deezer first (fast, no key), then the images MusicBrainz links on
+// Wikimedia Commons. Fetch them one at a time with FetchPhoto.
+func ArtistPhotoCandidates(name string) ([]PhotoCandidate, error) {
+	name = cleanArtistName(name)
+	if name == "" {
+		return nil, errors.New("empty artist name")
+	}
+	var out []PhotoCandidate
+	var errs []string
+	if c, err := deezerCandidates(name); err != nil {
+		errs = append(errs, "deezer: "+err.Error())
+	} else {
+		out = append(out, c...)
+	}
+	if c, err := commonsCandidates(name); err != nil {
+		errs = append(errs, "musicbrainz: "+err.Error())
+	} else {
+		out = append(out, c...)
+	}
+	if len(out) == 0 {
+		return nil, errors.New(strings.Join(errs, "; "))
+	}
+	return out, nil
+}
+
+// FetchPhoto downloads one candidate, rejecting placeholder silhouettes.
+func FetchPhoto(c PhotoCandidate) ([]byte, error) {
+	data, err := get(c.URL)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) < 4000 {
+		return nil, errors.New("placeholder image")
+	}
+	return data, nil
+}
+
+// FindArtistOnline returns the first usable photo of the artist.
+func FindArtistOnline(name string) ([]byte, string, error) {
+	cands, err := ArtistPhotoCandidates(name)
 	if err != nil {
 		return nil, "", err
+	}
+	last := errors.New("no usable photo")
+	for _, c := range cands {
+		data, err := FetchPhoto(c)
+		if err == nil {
+			return data, c.Source, nil
+		}
+		last = err
+	}
+	return nil, "", last
+}
+
+func deezerCandidates(name string) ([]PhotoCandidate, error) {
+	q := url.Values{"q": {name}, "limit": {"10"}}
+	body, err := get("https://api.deezer.com/search/artist?" + q.Encode())
+	if err != nil {
+		return nil, err
 	}
 	var res struct {
 		Data []struct {
@@ -166,12 +234,11 @@ func findDeezerArtist(name string) ([]byte, string, error) {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &res); err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	want := strings.TrimPrefix(simplify(name), "the ")
+	var out []PhotoCandidate
 	for _, r := range res.Data {
-		// exact match only: a photo of the wrong "Aurora" is worse than none
-		if strings.TrimPrefix(simplify(r.Name), "the ") != want {
+		if !sameArtist(r.Name, name) {
 			continue
 		}
 		u := r.PictureXL
@@ -181,23 +248,19 @@ func findDeezerArtist(name string) ([]byte, string, error) {
 		if u == "" || strings.Contains(u, "/artist//") {
 			continue // deezer's placeholder for artists without a photo
 		}
-		data, err := get(u)
-		if err != nil {
-			return nil, "", err
-		}
-		if len(data) < 4000 {
-			continue // placeholder silhouette
-		}
-		return data, "Deezer: " + r.Name, nil
+		out = append(out, PhotoCandidate{URL: u, Source: "Deezer: " + r.Name})
 	}
-	return nil, "", errors.New("no matching artist")
+	if len(out) == 0 {
+		return nil, errors.New("no matching artist")
+	}
+	return out, nil
 }
 
-func findCommonsArtist(name string) ([]byte, string, error) {
-	q := url.Values{"query": {fmt.Sprintf(`artist:"%s"`, name)}, "fmt": {"json"}, "limit": {"1"}}
+func commonsCandidates(name string) ([]PhotoCandidate, error) {
+	q := url.Values{"query": {fmt.Sprintf(`artist:"%s"`, name)}, "fmt": {"json"}, "limit": {"5"}}
 	body, err := get("https://musicbrainz.org/ws/2/artist/?" + q.Encode())
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	var res struct {
 		Artists []struct {
@@ -206,33 +269,44 @@ func findCommonsArtist(name string) ([]byte, string, error) {
 		} `json:"artists"`
 	}
 	if err := json.Unmarshal(body, &res); err != nil || len(res.Artists) == 0 {
-		return nil, "", errors.New("no artist found")
+		return nil, errors.New("no artist found")
 	}
-	ar := res.Artists[0]
-	body, err = get("https://musicbrainz.org/ws/2/artist/" + ar.ID + "?inc=url-rels&fmt=json")
-	if err != nil {
-		return nil, "", err
-	}
-	var rel struct {
-		Relations []struct {
-			Type string `json:"type"`
-			URL  struct {
-				Resource string `json:"resource"`
-			} `json:"url"`
-		} `json:"relations"`
-	}
-	if err := json.Unmarshal(body, &rel); err != nil {
-		return nil, "", err
-	}
-	for _, r := range rel.Relations {
-		if r.Type != "image" || !strings.Contains(r.URL.Resource, "commons.wikimedia.org/wiki/File:") {
+	var out []PhotoCandidate
+	for _, ar := range res.Artists {
+		if !sameArtist(ar.Name, name) {
 			continue
 		}
-		file := r.URL.Resource[strings.Index(r.URL.Resource, "File:")+5:]
-		data, err := get("https://commons.wikimedia.org/wiki/Special:FilePath/" + file + "?width=800")
-		if err == nil && len(data) > 0 {
-			return data, "Wikimedia Commons: " + ar.Name, nil
+		body, err := get("https://musicbrainz.org/ws/2/artist/" + ar.ID + "?inc=url-rels&fmt=json")
+		if err != nil {
+			continue
+		}
+		var rel struct {
+			Relations []struct {
+				Type string `json:"type"`
+				URL  struct {
+					Resource string `json:"resource"`
+				} `json:"url"`
+			} `json:"relations"`
+		}
+		if json.Unmarshal(body, &rel) != nil {
+			continue
+		}
+		for _, r := range rel.Relations {
+			if r.Type != "image" || !strings.Contains(r.URL.Resource, "commons.wikimedia.org/wiki/File:") {
+				continue
+			}
+			file := r.URL.Resource[strings.Index(r.URL.Resource, "File:")+5:]
+			out = append(out, PhotoCandidate{
+				URL:    "https://commons.wikimedia.org/wiki/Special:FilePath/" + file + "?width=800",
+				Source: "Wikimedia Commons: " + ar.Name,
+			})
+		}
+		if len(out) > 0 {
+			break // one matching MusicBrainz entry is enough
 		}
 	}
-	return nil, "", errors.New("no image linked")
+	if len(out) == 0 {
+		return nil, errors.New("no image linked")
+	}
+	return out, nil
 }
