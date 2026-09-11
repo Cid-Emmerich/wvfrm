@@ -66,18 +66,14 @@ var Registry = []Visualizer{
 	&Center{},
 	&Wave{},
 	&Scope{},
-	&Spectrogram{},
 	&Circle{},
 	&Pulse{},
 	&Joy{},
 	&Rain{},
 	&VU{},
 	&Lissajous{},
-	&Ripple{},
 	&LED{},
 	&Matrix{},
-	&Skate{},
-	&Flock{},
 	&MacOS{},
 }
 

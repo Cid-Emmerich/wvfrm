@@ -5,7 +5,7 @@ WezTerm, Terminal.app and any other modern terminal.
 
 wvfrm borrows the simple folder based library and `wvfrm <what to play>` command
 line from **kew**, and the audio reactive visualizers from **CLIAMP**, then adds
-a lot more: seventeen visualizer styles with live tuning, album art as true
+a lot more: thirteen visualizer styles with live tuning, album art as true
 colour blocks, ASCII or pixel-perfect Kitty graphics, an online cover finder
 that attaches art to your files, twelve colour themes plus a *match* theme that
 takes its colours from the cover of the song playing, shuffle by track or by
@@ -177,13 +177,11 @@ cached in `~/.cache/wvfrm/lyrics`, so each song is only ever transcribed once.
 
 ### Visualizers
 
-Seventeen styles (`v` to cycle): **bars**, **center**, **wave**, **scope**,
-**spectrogram**, **circle**, **pulse**, **joy**, **rain**, **vu**,
-**lissajous**, **ripple**, **led**, **matrix** (digital rain), **skate** (a
-skateboarder riding the spectrum and jumping on the beat), **flock** (birds
-flying to the music) and **macos** (a dithered field with a MACOS wordmark, a
-wink at CLIAMP's omarchy mode). All of them react to the audio that is
-actually playing, using an FFT on the output stream.
+Thirteen styles (`v` to cycle): **bars**, **center**, **wave**, **scope**,
+**circle**, **pulse**, **joy**, **rain**, **vu**, **lissajous**, **led**,
+**matrix** (digital rain) and **macos** (a dithered field with a MACOS
+wordmark, a wink at CLIAMP's omarchy mode). All of them react to the audio
+that is actually playing, using an FFT on the output stream.
 
 Everything about them is adjustable while you watch, in the now-playing view:
 

@@ -16,6 +16,12 @@ go build -o wvfrm ./cmd/wvfrm
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-10
+
+### Removed
+- Visualizers `spectrogram`, `ripple`, `skate` and `flock`. Thirteen styles
+  remain. A saved `vis` setting that names one of these now opens on `bars`.
+
 ## [1.1.0] - 2026-09-10
 
 ### Added
@@ -63,6 +69,7 @@ First release.
 - Themes: twelve built in plus `match`, derived from the album art.
 - ctrl+k help overlay; settings saved on quit.
 
-[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.0.0

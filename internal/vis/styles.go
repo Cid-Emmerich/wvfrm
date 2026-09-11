@@ -212,47 +212,6 @@ func (s *Scope) Draw(c *Canvas, f *Frame) {
 }
 
 // ---------------------------------------------------------------------------
-// Spectrogram: scrolling frequency heat map.
-
-type Spectrogram struct {
-	hist [][]float64
-	b    bands
-}
-
-func (*Spectrogram) Name() string     { return "spectrogram" }
-func (*Spectrogram) Describe() string { return "scrolling frequency heat map" }
-
-func (s *Spectrogram) Draw(c *Canvas, f *Frame) {
-	rows := c.H * 2 // half blocks give double vertical resolution
-	vals := s.b.update(f, rows, 0)
-	col := make([]float64, rows)
-	copy(col, vals)
-	s.hist = append(s.hist, col)
-	if len(s.hist) > c.W {
-		s.hist = s.hist[len(s.hist)-c.W:]
-	}
-	x0 := c.W - len(s.hist)
-	for i, hcol := range s.hist {
-		x := x0 + i
-		for y := 0; y < c.H; y++ {
-			// row 0 at top = highest frequency
-			top := hcol[rows-1-(y*2)]
-			bot := hcol[rows-1-(y*2+1)]
-			ct := heat(f, top)
-			cb := heat(f, bot)
-			c.SetBg(x, y, '▀', ct, cb)
-		}
-	}
-}
-
-func heat(f *Frame, v float64) art.RGB {
-	v = clamp01(v)
-	base := colorAt(f, v, v)
-	// fade towards black for quiet bins so the display is not a wall of colour
-	return art.Mix(art.RGB{R: 8, G: 8, B: 12}, base, math.Pow(v, 0.8))
-}
-
-// ---------------------------------------------------------------------------
 // Circle: radial spectrum.
 
 type Circle struct{ b bands }
@@ -557,66 +516,6 @@ func (s *Lissajous) Draw(c *Canvas, f *Frame) {
 		c.Text(1, 0, "L", f.Theme.Muted)
 		c.Text(c.W-2, 0, "R", f.Theme.Muted)
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Ripple: rings that expand on beats.
-
-type ring struct {
-	r, v, life float64
-	u          float64
-}
-
-type Ripple struct {
-	e     energy
-	rings []ring
-	last  float64
-	cool  int
-}
-
-func (*Ripple) Name() string     { return "ripple" }
-func (*Ripple) Describe() string { return "beat-triggered ripples" }
-
-func (s *Ripple) Draw(c *Canvas, f *Frame) {
-	s.e.update(f)
-	if s.cool > 0 {
-		s.cool--
-	}
-	if s.e.bass > 0.55 && s.e.bass > s.last+0.08 && s.cool == 0 {
-		s.rings = append(s.rings, ring{r: 0.5, v: 0.6 + s.e.bass, life: 1, u: rand.Float64()})
-		s.cool = 4
-	}
-	s.last = s.e.bass
-	cx, cy := float64(c.W)/2, float64(c.H)/2
-	maxR := math.Sqrt(cx*cx/4 + cy*cy)
-	alive := s.rings[:0]
-	for _, rg := range s.rings {
-		rg.r += rg.v
-		rg.life = 1 - rg.r/maxR
-		if rg.life > 0 {
-			alive = append(alive, rg)
-		}
-	}
-	s.rings = alive
-	for _, rg := range s.rings {
-		steps := int(rg.r*8) + 16
-		col := art.Mix(f.Theme.Select, colorAt(f, rg.life, rg.u), rg.life)
-		for i := 0; i < steps; i++ {
-			a := 2 * math.Pi * float64(i) / float64(steps)
-			x := int(cx + math.Cos(a)*rg.r*2)
-			y := int(cy + math.Sin(a)*rg.r)
-			ch := '·'
-			if rg.life > 0.6 {
-				ch = '●'
-			} else if rg.life > 0.3 {
-				ch = '∘'
-			}
-			c.Set(x, y, ch, col)
-		}
-	}
-	// centre glyph pulses with level
-	glyphs := []rune{'·', '∘', '○', '◎', '◉', '●'}
-	c.Set(int(cx), int(cy), glyphs[int(clamp01(s.e.level)*5.999)], colorAt(f, s.e.level, 0.5))
 }
 
 // ---------------------------------------------------------------------------
