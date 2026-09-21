@@ -107,6 +107,102 @@ func TestLibraryModesPlaylists(t *testing.T) {
 	}
 }
 
+// TestFavoritesKey presses B in each view and checks the Favorites playlist.
+func TestFavoritesKey(t *testing.T) {
+	root := os.Getenv("WVFRM_TEST_MUSIC")
+	if root == "" {
+		t.Skip("set WVFRM_TEST_MUSIC")
+	}
+	tmp := t.TempDir()
+	copyTree(t, root, tmp)
+	lib, err := library.Load(tmp, filepath.Join(t.TempDir(), "c.json"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.MusicDir = tmp
+	cfg.ConfigPath = filepath.Join(t.TempDir(), "rc")
+	cfg.CachePath = filepath.Join(t.TempDir(), "cache.json")
+	pl := audio.New()
+	defer pl.Close()
+	scr := tcell.NewSimulationScreen("UTF-8")
+	scr.Init()
+	scr.SetSize(110, 30)
+	a := New(&cfg, lib, pl)
+	a.scr = scr
+
+	// nothing playing, nothing selected: B just complains
+	a.view = ViewNow
+	key(a, 'B')
+	if !a.toastErr || lib.Favorites().Tracks != nil {
+		t.Errorf("B with nothing playing: toast=%q favorites=%v", a.toast, lib.Favorites().Tracks)
+	}
+
+	// library view: B on an album row falls back to the playing song, which
+	// there is none of yet, so still nothing
+	a.view = ViewLibrary
+	a.lv.setMode(ModeAlbums)
+	a.lv.cursor = 0
+	key(a, 'B')
+	if len(lib.Favorites().Tracks) != 0 {
+		t.Errorf("B on an album row with nothing playing should add nothing")
+	}
+
+	// expand the album and press B on its first track
+	special(a, tcell.KeyRight)
+	special(a, tcell.KeyDown)
+	n := a.lv.current()
+	if n == nil || n.kind != library.KindTrack {
+		t.Fatalf("cursor should be on a track, got %+v", n)
+	}
+	first := n.track
+	key(a, 'B')
+	if fav := lib.Favorites(); len(fav.Tracks) != 1 || fav.Tracks[0] != first {
+		t.Fatalf("B on a track: %+v", fav.Tracks)
+	}
+	if !strings.Contains(a.toast, "added to Favorites") || a.toastErr {
+		t.Errorf("toast after add: %q", a.toast)
+	}
+
+	// now-playing view: B takes the playing song
+	special(a, tcell.KeyEnter) // plays the album from this track
+	key(a, 'l')                // next track
+	cur := pl.Current()
+	if cur == nil || cur == first || a.view != ViewNow {
+		t.Fatalf("expected a different track playing in the now view, got %+v view=%d", cur, a.view)
+	}
+	key(a, 'B')
+	if fav := lib.Favorites(); len(fav.Tracks) != 2 || fav.Tracks[1] != cur {
+		t.Fatalf("B in now-playing: %+v", fav.Tracks)
+	}
+
+	// queue view: B takes the track under the cursor, and a second press
+	// on the same track removes it
+	key(a, '3')
+	a.qCursor = 0 // first track of the album, already a favorite
+	tracks, _ := pl.Queue()
+	if tracks[0] != first {
+		t.Fatalf("queue[0] should be the first track")
+	}
+	key(a, 'B')
+	if fav := lib.Favorites(); len(fav.Tracks) != 1 || fav.Tracks[0] != cur {
+		t.Fatalf("B in queue should remove the first track: %+v", fav.Tracks)
+	}
+	if !strings.Contains(a.toast, "removed from Favorites") {
+		t.Errorf("toast after remove: %q", a.toast)
+	}
+
+	// the library's playlists mode lists Favorites and the footer mentions B
+	key(a, '2')
+	a.lv.setMode(ModePlaylists)
+	a.toast = "" // the toast covers the footer hints while it is shown
+	a.draw()
+	txt := screenText(scr)
+	if !strings.Contains(txt, "Favorites") || !strings.Contains(txt, "B favorite") {
+		t.Errorf("playlists mode should list Favorites:\n%s", txt)
+	}
+}
+
 func copyTree(t *testing.T, src, dst string) {
 	t.Helper()
 	err := filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {

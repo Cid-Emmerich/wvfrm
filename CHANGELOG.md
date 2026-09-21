@@ -16,6 +16,19 @@ go build -o wvfrm ./cmd/wvfrm
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-09-21
+
+### Added
+- `B` adds the song to a `Favorites` playlist, or removes it when it is
+  already there. It works in every view: the selected track in the library
+  or queue, otherwise the playing song. Favorites is an ordinary playlist
+  file (`Playlists/Favorites.m3u8`), so it appears in the library's
+  playlists mode and `wvfrm playlist favorites` plays it.
+
+### Changed
+- `B` no longer cycles the library browse mode backwards; `b` still cycles
+  forwards through artists, albums and playlists.
+
 ## [1.1.4] - 2026-09-10
 
 ### Changed
@@ -110,7 +123,8 @@ First release.
 - Themes: twelve built in plus `match`, derived from the album art.
 - ctrl+k help overlay; settings saved on quit.
 
-[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/Cid-Emmerich/wvfrm/compare/v1.1.5...HEAD
+[1.1.5]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.5
 [1.1.4]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.4
 [1.1.3]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.3
 [1.1.2]: https://github.com/Cid-Emmerich/wvfrm/releases/tag/v1.1.2

@@ -187,6 +187,8 @@ func (a *App) handleKey(e *tcell.EventKey) {
 			a.switchView(ViewLibrary)
 			a.lv.revealTrack(t)
 		}
+	case 'B':
+		a.toggleFavorite()
 	default:
 		switch a.view {
 		case ViewNow:
@@ -278,10 +280,6 @@ func (a *App) libKey(r rune) {
 		a.lv.filter = ""
 		a.lv.setMode(a.lv.mode + 1)
 		a.showToast("library: "+modeNames[a.lv.mode]+" (b to switch)", false)
-	case 'B':
-		a.lv.filter = ""
-		a.lv.setMode(a.lv.mode - 1)
-		a.showToast("library: "+modeNames[a.lv.mode]+" (b to switch)", false)
 	case 'P':
 		if n := a.lv.current(); n != nil {
 			what := "selection"
@@ -317,6 +315,43 @@ func (a *App) libKey(r rune) {
 		a.lv.collapseAll()
 	case 'S':
 		a.rescan()
+	}
+}
+
+// favoriteTarget picks the song B acts on: the track under the cursor in
+// the library or queue view, otherwise the song that is playing.
+func (a *App) favoriteTarget() *library.Track {
+	switch a.view {
+	case ViewLibrary:
+		if n := a.lv.current(); n != nil && n.kind == library.KindTrack && n.track != nil {
+			return n.track
+		}
+	case ViewQueue:
+		if tracks, _ := a.pl.Queue(); a.qCursor >= 0 && a.qCursor < len(tracks) {
+			return tracks[a.qCursor]
+		}
+	}
+	return a.pl.Current()
+}
+
+// toggleFavorite adds the target song to the Favorites playlist, or removes
+// it when it is already there.
+func (a *App) toggleFavorite() {
+	t := a.favoriteTarget()
+	if t == nil {
+		a.showToast("nothing to favorite: play or select a song first", true)
+		return
+	}
+	added, err := a.lib.ToggleFavorite(t)
+	if err != nil {
+		a.showToast("could not update favorites: "+err.Error(), true)
+		return
+	}
+	a.lv.reloadPlaylists()
+	if added {
+		a.showToast("♥ added to "+library.FavoritesName+": "+t.Title, false)
+	} else {
+		a.showToast("removed from "+library.FavoritesName+": "+t.Title, false)
 	}
 }
 

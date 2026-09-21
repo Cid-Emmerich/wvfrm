@@ -460,12 +460,12 @@ func (a *App) drawBottomLine(w, h int) {
 		if !a.showArt {
 			mode = "v style · a art"
 		}
-		keys = []string{"j/k/l prev/play/next", mode, "s shuffle", "f crossfade", "t theme", "y lyrics", "ctrl+k help"}
+		keys = []string{"j/k/l prev/play/next", mode, "B favorite", "s shuffle", "f crossfade", "t theme", "y lyrics", "ctrl+k help"}
 	case ViewLibrary:
 		next := modeNames[(a.lv.mode+1)%len(modeNames)]
-		keys = []string{"↑/↓ →/← browse", "enter play", "e queue", "b " + next, "/ filter", "ctrl+k help"}
+		keys = []string{"↑/↓ →/← browse", "enter play", "e queue", "B favorite", "b " + next, "/ filter", "ctrl+k help"}
 	case ViewQueue:
-		keys = []string{"↑/↓ move", "enter jump", "x remove", "P save playlist", "C clear", "ctrl+k help"}
+		keys = []string{"↑/↓ move", "enter jump", "x remove", "B favorite", "P save playlist", "C clear", "ctrl+k help"}
 	}
 	a.drawKeyHints(1, y, w-2, keys)
 }
@@ -636,7 +636,7 @@ func (a *App) drawLibrary(w, h int) {
 		case len(a.lib.Tracks) == 0:
 			msg = "library is empty – run: wvfrm path /your/music"
 		case v.filter == "" && v.mode == ModePlaylists:
-			msg = "no playlists yet – press P in the queue (or on an artist or album) to save one"
+			msg = "no playlists yet – press B on a song to start Favorites, or P to save the queue, an artist or an album"
 		}
 		a.puts(2, 2, msg, a.st(a.th.Muted), w)
 	}

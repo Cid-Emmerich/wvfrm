@@ -124,6 +124,10 @@ Arrow keys move, `→`/`←` open and close artists and albums, `enter` plays.
 `e` adds the selection to the end of the queue, `E` plays it next. `/` filters
 the whole library as you type. `o` jumps to the song that is playing.
 
+`B` adds the selected track to the **Favorites** playlist, or removes it if it
+is already there. `B` works in every view: in the queue it takes the track under
+the cursor, in the now-playing view the song that is playing.
+
 `b` switches what the library lists: **artists** (the default tree), **albums**
 (every album in one flat list) or **playlists**. When an artist has a photo it
 appears in a panel beside the list as you move over their music, drawn in the
@@ -132,10 +136,12 @@ same style as the album art (`A`: blocks, ascii or pixel-perfect kitty).
 ### Playlists
 
 `P` in the queue view saves the current queue as a playlist; `P` on an artist
-or album in the library saves that. Playlists are plain `.m3u8` files in a
-`Playlists` folder inside your music directory, so other players can read
-them. Browse them with `b` in the library, play one with `enter`, delete one
-with `delete`, or start one from the shell with `wvfrm playlist <name>`.
+or album in the library saves that. `B` toggles a song in the `Favorites`
+playlist, which is created the first time you press it. Playlists are plain
+`.m3u8` files in a `Playlists` folder inside your music directory, so other
+players can read them. Browse them with `b` in the library, play one with
+`enter`, delete one with `delete`, or start one from the shell with
+`wvfrm playlist <name>` (`wvfrm playlist favorites` plays your favorites).
 
 ### Album art
 

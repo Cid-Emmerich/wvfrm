@@ -102,6 +102,13 @@ func (l *Library) SavePlaylist(name string, tracks []*Track) (*Playlist, error) 
 	if len(tracks) == 0 {
 		return nil, fmt.Errorf("nothing to save")
 	}
+	return l.writePlaylist(name, tracks)
+}
+
+// writePlaylist does the file writing for SavePlaylist and the favorites
+// toggle. Unlike SavePlaylist it accepts an empty track list, so removing
+// the last favorite leaves an empty Favorites playlist rather than failing.
+func (l *Library) writePlaylist(name string, tracks []*Track) (*Playlist, error) {
 	safe := strings.Map(func(r rune) rune {
 		if strings.ContainsRune(`/\:*?"<>|`, r) {
 			return '-'
@@ -127,6 +134,53 @@ func (l *Library) SavePlaylist(name string, tracks []*Track) (*Playlist, error) 
 		return nil, err
 	}
 	return &Playlist{Name: name, Path: path, Tracks: append([]*Track(nil), tracks...)}, nil
+}
+
+// FavoritesName is the playlist that B adds songs to. It is an ordinary
+// playlist file, <root>/Playlists/Favorites.m3u8, so it shows up in the
+// library's playlists mode and can be played with "wvfrm playlist favorites".
+const FavoritesName = "Favorites"
+
+// Favorites loads the favorites playlist. When the file does not exist yet
+// an empty playlist is returned, never nil.
+func (l *Library) Favorites() *Playlist {
+	path := filepath.Join(l.Root, PlaylistDir, FavoritesName+".m3u8")
+	pl, err := l.LoadPlaylist(path)
+	if err != nil {
+		return &Playlist{Name: FavoritesName, Path: path}
+	}
+	return pl
+}
+
+// IsFavorite reports whether t is in the favorites playlist.
+func (l *Library) IsFavorite(t *Track) bool {
+	for _, f := range l.Favorites().Tracks {
+		if f == t {
+			return true
+		}
+	}
+	return false
+}
+
+// ToggleFavorite adds t to the favorites playlist, or removes it when it is
+// already there. It returns true when the track was added.
+func (l *Library) ToggleFavorite(t *Track) (added bool, err error) {
+	if t == nil {
+		return false, fmt.Errorf("no track")
+	}
+	fav := l.Favorites()
+	var kept []*Track
+	for _, f := range fav.Tracks {
+		if f != t {
+			kept = append(kept, f)
+		}
+	}
+	added = len(kept) == len(fav.Tracks)
+	if added {
+		kept = append(kept, t)
+	}
+	_, err = l.writePlaylist(FavoritesName, kept)
+	return added, err
 }
 
 // FindPlaylist returns the saved playlist whose name best matches query.
